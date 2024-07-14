@@ -1,0 +1,68 @@
+name: siot_driver_pro
+description: A new Flutter project.
+publish_to: 'none'
+
+version: 1.0.0+1
+
+environment:
+  sdk: '>=3.1.5 <4.0.0'
+
+dependencies:
+  flutter:
+    sdk: flutter
+
+  cupertino_icons: ^1.0.2
+  keyboard_actions:
+  http:
+  flutter_blue_plus:
+  location:
+  geolocator:
+  hive_flutter:
+  flutter_xlider:
+  flutter_local_notifications:
+  intl:
+  common_utils:
+  bezier_chart_plus:
+  table_calendar:
+  pdf:
+  path_provider:
+  open_file:
+  flutter_native_splash:
+  permission_handler:
+  internet_connection_checker_plus:
+
+flutter_native_splash:
+  android: true
+  ios: false
+  web: false
+  color: "#FFFFFF"
+  image: "assets/images/ic_launcher-playstore.png"
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_launcher_icons: 
+
+flutter_icons:
+  android: true
+  image_path: "assets/images/ic_launcher-playstore.png"
+
+  flutter_lints: ^2.0.0
+
+flutter:
+
+  uses-material-design: true
+
+  assets:
+    - assets/images/
+    - assets/images/login/
+    - assets/images/order/
+    - assets/images/goods/
+    - assets/images/home/
+    - assets/images/profile/
+    - assets/images/stats/
+
+  fonts:
+    - family: RobotoThin
+      fonts:
+        - asset: assets/fonts/Roboto-Thin.ttf
