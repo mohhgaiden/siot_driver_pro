@@ -541,6 +541,17 @@ class HomePageState extends State<HomePage> {
               icon: Icon(Icons.pause_circle_outline,color:isStart ?Colors.black :Colors.grey,size: 24,)
             ),
             IconButton(
+              tooltip: 'Actualiser',
+              onPressed: () {FlutterBluePlus.startScan();},
+              icon: const LoadAssetImage(
+                'home/refresh.png',
+                key: Key('refresh'),
+                width: 24.0,
+                height: 24.0,
+                color: iconColor
+              )
+            ),
+            IconButton(
               tooltip: 'Paramètres',
               key: _addKey,
               onPressed: _showAddMenu,
