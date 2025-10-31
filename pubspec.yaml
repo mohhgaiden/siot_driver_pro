@@ -2,16 +2,27 @@ name: siot_driver_pro
 description: A new Flutter project.
 publish_to: 'none'
 
+<<<<<<< HEAD
 version: 1.0.0+1
 
 environment:
   sdk: '>=3.1.5 <4.0.0'
+=======
+version: 2.0.5+13
+
+environment:
+  sdk: ^3.7.2
+>>>>>>> edc460f (Initial commit)
 
 dependencies:
   flutter:
     sdk: flutter
 
+<<<<<<< HEAD
   cupertino_icons: ^1.0.2
+=======
+  cupertino_icons: ^1.0.8
+>>>>>>> edc460f (Initial commit)
   keyboard_actions:
   http:
   flutter_blue_plus:
@@ -22,7 +33,10 @@ dependencies:
   flutter_local_notifications:
   intl:
   common_utils:
+<<<<<<< HEAD
   bezier_chart_plus:
+=======
+>>>>>>> edc460f (Initial commit)
   table_calendar:
   pdf:
   path_provider:
@@ -47,7 +61,11 @@ flutter_icons:
   android: true
   image_path: "assets/images/ic_launcher-playstore.png"
 
+<<<<<<< HEAD
   flutter_lints: ^2.0.0
+=======
+  flutter_lints: ^5.0.0
+>>>>>>> edc460f (Initial commit)
 
 flutter:
 

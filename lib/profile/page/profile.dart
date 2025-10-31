@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:hive_flutter/adapters.dart';
+<<<<<<< HEAD
 import '../../res/dimens.dart';
+=======
+>>>>>>> edc460f (Initial commit)
 import '../../res/gaps.dart';
 import '../../res/styles.dart';
 import '../../widgets/load_image.dart';
@@ -14,6 +17,7 @@ class ProfilePage extends StatefulWidget {
 }
 
 class _ProfilePageState extends State<ProfilePage> {
+<<<<<<< HEAD
   
   List<Map<String, dynamic>> items = [];
   final infoUser = Hive.box('LOGGED_IN_USER');
@@ -37,6 +41,32 @@ class _ProfilePageState extends State<ProfilePage> {
         "user_store_interval": item["user_store_interval"]
       };
     }).toList();
+=======
+  List<Map<String, dynamic>> items = [];
+  final infoUser = Hive.box('LOGGED_IN_USER');
+  void refresh() {
+    final data =
+        infoUser.keys.map((key) {
+          final item = infoUser.get(key);
+          return {
+            "key": key,
+            "error": item["error"],
+            "connection_established": item["connection_established"],
+            "msg": item["msg"],
+            "uuid_user": item["uuid_user"],
+            "user_name": item["user_name"],
+            "user_surname": item["user_surname"],
+            "user_phone": item["user_phone"],
+            "user_can_param": item["user_can_param"],
+            "user_can_report": item["user_can_report"],
+            "user_can_print": item["user_can_print"],
+            "user_can_stor": item["user_can_stor"],
+            "user_langue": item["user_langue"],
+            "user_clear_interval": item["user_clear_interval"],
+            "user_store_interval": item["user_store_interval"],
+          };
+        }).toList();
+>>>>>>> edc460f (Initial commit)
     setState(() {
       items = data.reversed.toList();
       print(items);
@@ -46,6 +76,7 @@ class _ProfilePageState extends State<ProfilePage> {
   List<Map<String, dynamic>> items1 = [];
   final listCapteurs = Hive.box('LIST_CAPTEURS');
   void refresh1() {
+<<<<<<< HEAD
     final data = listCapteurs.keys.map((key) {
       final item = listCapteurs.get(key);
       return {"key": key,
@@ -57,6 +88,21 @@ class _ProfilePageState extends State<ProfilePage> {
         "interval_stockage": item["interval_stockage"]
       };
     }).toList();
+=======
+    final data =
+        listCapteurs.keys.map((key) {
+          final item = listCapteurs.get(key);
+          return {
+            "key": key,
+            "MacAddrs": item["MacAddrs"],
+            "Name": item["Name"],
+            "Type": item["Type"],
+            "RemoteAlert": item["RemoteAlert"],
+            "Option_stockage": item["Option_stockage"],
+            "interval_stockage": item["interval_stockage"],
+          };
+        }).toList();
+>>>>>>> edc460f (Initial commit)
     setState(() {
       items1 = data.reversed.toList();
       print(items1);
@@ -65,19 +111,35 @@ class _ProfilePageState extends State<ProfilePage> {
 
   @override
   void initState() {
+<<<<<<< HEAD
     refresh();refresh1();
+=======
+    refresh();
+    refresh1();
+>>>>>>> edc460f (Initial commit)
     super.initState();
   }
 
   @override
   Widget build(BuildContext context) {
+<<<<<<< HEAD
 
+=======
+>>>>>>> edc460f (Initial commit)
     final List<Widget> children = [
       Gaps.vGap10,
       Row(
         children: <Widget>[
           const ClipOval(
+<<<<<<< HEAD
             child: LoadAssetImage('profile/icon_avatar.png', width: 44.0, height: 44.0),
+=======
+            child: LoadAssetImage(
+              'profile/icon_avatar.png',
+              width: 44.0,
+              height: 44.0,
+            ),
+>>>>>>> edc460f (Initial commit)
           ),
           Gaps.hGap8,
           Expanded(
@@ -85,9 +147,22 @@ class _ProfilePageState extends State<ProfilePage> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: <Widget>[
+<<<<<<< HEAD
                   Text('${items.elementAt(0)["user_name"]} ${items.elementAt(0)["user_surname"]}'),
                   Gaps.vGap5,
                   items.elementAt(0)["user_phone"] !='' ?Text('${items.elementAt(0)["user_phone"]}'):Text("il n'y a pas de telephone",style: TextStyles.textGray12),
+=======
+                  Text(
+                    '${items.elementAt(0)["user_name"]} ${items.elementAt(0)["user_surname"]}',
+                  ),
+                  Gaps.vGap5,
+                  items.elementAt(0)["user_phone"] != ''
+                      ? Text('${items.elementAt(0)["user_phone"]}')
+                      : Text(
+                        "il n'y a pas de telephone",
+                        style: TextStyles.textGray12,
+                      ),
+>>>>>>> edc460f (Initial commit)
                 ],
               ),
             ),
@@ -100,6 +175,7 @@ class _ProfilePageState extends State<ProfilePage> {
         children: <Widget>[
           LoadAssetImage('profile/icon_address.png', width: 16.0, height: 16.0),
           Gaps.hGap4,
+<<<<<<< HEAD
           Expanded(child: Text("Pas d'adresse", maxLines: 2,style: TextStyles.textSize12,)),
         ],
       ),
@@ -108,6 +184,19 @@ class _ProfilePageState extends State<ProfilePage> {
         '${items1.length} Capteurs Autorisé',
         style: TextStyles.textSize16,
       ),
+=======
+          Expanded(
+            child: Text(
+              "Pas d'adresse",
+              maxLines: 2,
+              style: TextStyles.textSize12,
+            ),
+          ),
+        ],
+      ),
+      Gaps.vGap16,
+      Text('${items1.length} Capteurs Autorisé', style: TextStyles.textSize16),
+>>>>>>> edc460f (Initial commit)
       ListView.builder(
         shrinkWrap: true,
         physics: const NeverScrollableScrollPhysics(),
@@ -123,6 +212,7 @@ class _ProfilePageState extends State<ProfilePage> {
         padding: const EdgeInsets.symmetric(horizontal: 16.0),
         //bottomButton: bottomMenu,
         children: children,
+<<<<<<< HEAD
       )
     );
   }
@@ -138,6 +228,8 @@ class _ProfilePageState extends State<ProfilePage> {
             Text(content)
           ],
         ),
+=======
+>>>>>>> edc460f (Initial commit)
       ),
     );
   }
@@ -148,7 +240,15 @@ class _ProfilePageState extends State<ProfilePage> {
       children: <Widget>[
         Padding(
           padding: const EdgeInsets.only(top: 5.0),
+<<<<<<< HEAD
           child: LoadAssetImage('profile/${items1.elementAt(index)["Type"]}.jpg', width: 36.0, height: 36.0),
+=======
+          child: LoadAssetImage(
+            'profile/${items1.elementAt(index)["Type"]}.jpg',
+            width: 36.0,
+            height: 36.0,
+          ),
+>>>>>>> edc460f (Initial commit)
         ),
         Gaps.hGap8,
         Expanded(
@@ -161,7 +261,14 @@ class _ProfilePageState extends State<ProfilePage> {
                 overflow: TextOverflow.ellipsis,
               ),
               Gaps.vGap4,
+<<<<<<< HEAD
               Text(items1.elementAt(index)["MacAddrs"], style: Theme.of(context).textTheme.titleSmall),
+=======
+              Text(
+                items1.elementAt(index)["MacAddrs"],
+                style: Theme.of(context).textTheme.titleSmall,
+              ),
+>>>>>>> edc460f (Initial commit)
             ],
           ),
         ),
@@ -170,6 +277,7 @@ class _ProfilePageState extends State<ProfilePage> {
 
     return DecoratedBox(
       decoration: BoxDecoration(
+<<<<<<< HEAD
         border: Border(
           bottom: Divider.createBorderSide(context, width: 0.8),
         ),
@@ -255,3 +363,14 @@ class _ProfilePageState extends State<ProfilePage> {
   }*/
 }
 
+=======
+        border: Border(bottom: Divider.createBorderSide(context, width: 0.8)),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: 16.0),
+        child: item,
+      ),
+    );
+  }
+}
+>>>>>>> edc460f (Initial commit)
