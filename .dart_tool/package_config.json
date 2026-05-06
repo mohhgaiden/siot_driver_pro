@@ -3,21 +3,21 @@
   "packages": [
     {
       "name": "ansicolor",
-      "rootUri": "file:///C:/Users/moh/AppData/Local/Pub/Cache/hosted/pub.dev/ansicolor-2.0.2",
+      "rootUri": "file:///C:/Users/moh/AppData/Local/Pub/Cache/hosted/pub.dev/ansicolor-2.0.3",
       "packageUri": "lib/",
       "languageVersion": "3.0"
     },
     {
       "name": "archive",
-      "rootUri": "file:///C:/Users/moh/AppData/Local/Pub/Cache/hosted/pub.dev/archive-3.4.10",
+      "rootUri": "file:///C:/Users/moh/AppData/Local/Pub/Cache/hosted/pub.dev/archive-3.6.1",
       "packageUri": "lib/",
-      "languageVersion": "2.12"
+      "languageVersion": "3.0"
     },
     {
       "name": "args",
-      "rootUri": "file:///C:/Users/moh/AppData/Local/Pub/Cache/hosted/pub.dev/args-2.4.2",
+      "rootUri": "file:///C:/Users/moh/AppData/Local/Pub/Cache/hosted/pub.dev/args-2.7.0",
       "packageUri": "lib/",
-      "languageVersion": "2.19"
+      "languageVersion": "3.3"
     },
     {
       "name": "async",
@@ -32,16 +32,16 @@
       "languageVersion": "2.12"
     },
     {
-      "name": "bezier_chart_plus",
-      "rootUri": "file:///C:/Users/moh/AppData/Local/Pub/Cache/hosted/pub.dev/bezier_chart_plus-0.0.1",
-      "packageUri": "lib/",
-      "languageVersion": "3.0"
-    },
-    {
       "name": "bidi",
       "rootUri": "file:///C:/Users/moh/AppData/Local/Pub/Cache/hosted/pub.dev/bidi-2.0.10",
       "packageUri": "lib/",
       "languageVersion": "2.12"
+    },
+    {
+      "name": "bluez",
+      "rootUri": "file:///C:/Users/moh/AppData/Local/Pub/Cache/hosted/pub.dev/bluez-0.8.2",
+      "packageUri": "lib/",
+      "languageVersion": "2.17"
     },
     {
       "name": "boolean_selector",
@@ -87,15 +87,15 @@
     },
     {
       "name": "connectivity_plus",
-      "rootUri": "file:///C:/Users/moh/AppData/Local/Pub/Cache/hosted/pub.dev/connectivity_plus-5.0.2",
+      "rootUri": "file:///C:/Users/moh/AppData/Local/Pub/Cache/hosted/pub.dev/connectivity_plus-7.0.0",
       "packageUri": "lib/",
-      "languageVersion": "2.18"
+      "languageVersion": "3.2"
     },
     {
       "name": "connectivity_plus_platform_interface",
-      "rootUri": "file:///C:/Users/moh/AppData/Local/Pub/Cache/hosted/pub.dev/connectivity_plus_platform_interface-1.2.4",
+      "rootUri": "file:///C:/Users/moh/AppData/Local/Pub/Cache/hosted/pub.dev/connectivity_plus_platform_interface-2.0.1",
       "packageUri": "lib/",
-      "languageVersion": "2.12"
+      "languageVersion": "2.18"
     },
     {
       "name": "convert",
@@ -117,9 +117,9 @@
     },
     {
       "name": "cupertino_icons",
-      "rootUri": "file:///C:/Users/moh/AppData/Local/Pub/Cache/hosted/pub.dev/cupertino_icons-1.0.6",
+      "rootUri": "file:///C:/Users/moh/AppData/Local/Pub/Cache/hosted/pub.dev/cupertino_icons-1.0.8",
       "packageUri": "lib/",
-      "languageVersion": "2.19"
+      "languageVersion": "3.1"
     },
     {
       "name": "dbus",
@@ -141,7 +141,13 @@
     },
     {
       "name": "ffi",
-      "rootUri": "file:///C:/Users/moh/AppData/Local/Pub/Cache/hosted/pub.dev/ffi-2.1.0",
+      "rootUri": "file:///C:/Users/moh/AppData/Local/Pub/Cache/hosted/pub.dev/ffi-2.2.0",
+      "packageUri": "lib/",
+      "languageVersion": "3.7"
+    },
+    {
+      "name": "file",
+      "rootUri": "file:///C:/Users/moh/AppData/Local/Pub/Cache/hosted/pub.dev/file-7.0.1",
       "packageUri": "lib/",
       "languageVersion": "3.0"
     },
@@ -153,39 +159,81 @@
     },
     {
       "name": "flutter_blue_plus",
-      "rootUri": "file:///C:/Users/moh/AppData/Local/Pub/Cache/hosted/pub.dev/flutter_blue_plus-1.32.1",
+      "rootUri": "file:///C:/Users/moh/AppData/Local/Pub/Cache/hosted/pub.dev/flutter_blue_plus-1.36.8",
       "packageUri": "lib/",
-      "languageVersion": "2.15"
+      "languageVersion": "3.0"
     },
     {
-      "name": "flutter_launcher_icons",
-      "rootUri": "file:///C:/Users/moh/AppData/Local/Pub/Cache/hosted/pub.dev/flutter_launcher_icons-0.13.1",
+      "name": "flutter_blue_plus_android",
+      "rootUri": "file:///C:/Users/moh/AppData/Local/Pub/Cache/hosted/pub.dev/flutter_blue_plus_android-7.0.4",
+      "packageUri": "lib/",
+      "languageVersion": "3.0"
+    },
+    {
+      "name": "flutter_blue_plus_darwin",
+      "rootUri": "file:///C:/Users/moh/AppData/Local/Pub/Cache/hosted/pub.dev/flutter_blue_plus_darwin-7.0.3",
+      "packageUri": "lib/",
+      "languageVersion": "3.0"
+    },
+    {
+      "name": "flutter_blue_plus_linux",
+      "rootUri": "file:///C:/Users/moh/AppData/Local/Pub/Cache/hosted/pub.dev/flutter_blue_plus_linux-7.0.3",
+      "packageUri": "lib/",
+      "languageVersion": "3.0"
+    },
+    {
+      "name": "flutter_blue_plus_platform_interface",
+      "rootUri": "file:///C:/Users/moh/AppData/Local/Pub/Cache/hosted/pub.dev/flutter_blue_plus_platform_interface-7.0.0",
+      "packageUri": "lib/",
+      "languageVersion": "3.0"
+    },
+    {
+      "name": "flutter_blue_plus_web",
+      "rootUri": "file:///C:/Users/moh/AppData/Local/Pub/Cache/hosted/pub.dev/flutter_blue_plus_web-7.0.2",
+      "packageUri": "lib/",
+      "languageVersion": "3.3"
+    },
+    {
+      "name": "flutter_foreground_task",
+      "rootUri": "file:///C:/Users/moh/AppData/Local/Pub/Cache/hosted/pub.dev/flutter_foreground_task-6.5.0",
       "packageUri": "lib/",
       "languageVersion": "2.18"
     },
     {
-      "name": "flutter_local_notifications",
-      "rootUri": "file:///C:/Users/moh/AppData/Local/Pub/Cache/hosted/pub.dev/flutter_local_notifications-17.0.0",
+      "name": "flutter_launcher_icons",
+      "rootUri": "file:///C:/Users/moh/AppData/Local/Pub/Cache/hosted/pub.dev/flutter_launcher_icons-0.14.4",
       "packageUri": "lib/",
-      "languageVersion": "2.17"
+      "languageVersion": "3.0"
+    },
+    {
+      "name": "flutter_lints",
+      "rootUri": "file:///C:/Users/moh/AppData/Local/Pub/Cache/hosted/pub.dev/flutter_lints-5.0.0",
+      "packageUri": "lib/",
+      "languageVersion": "3.5"
+    },
+    {
+      "name": "flutter_local_notifications",
+      "rootUri": "file:///C:/Users/moh/AppData/Local/Pub/Cache/hosted/pub.dev/flutter_local_notifications-18.0.1",
+      "packageUri": "lib/",
+      "languageVersion": "3.1"
     },
     {
       "name": "flutter_local_notifications_linux",
-      "rootUri": "file:///C:/Users/moh/AppData/Local/Pub/Cache/hosted/pub.dev/flutter_local_notifications_linux-4.0.0+1",
+      "rootUri": "file:///C:/Users/moh/AppData/Local/Pub/Cache/hosted/pub.dev/flutter_local_notifications_linux-5.0.0",
       "packageUri": "lib/",
-      "languageVersion": "2.17"
+      "languageVersion": "3.1"
     },
     {
       "name": "flutter_local_notifications_platform_interface",
-      "rootUri": "file:///C:/Users/moh/AppData/Local/Pub/Cache/hosted/pub.dev/flutter_local_notifications_platform_interface-7.0.0+1",
+      "rootUri": "file:///C:/Users/moh/AppData/Local/Pub/Cache/hosted/pub.dev/flutter_local_notifications_platform_interface-8.0.0",
       "packageUri": "lib/",
-      "languageVersion": "2.17"
+      "languageVersion": "3.1"
     },
     {
       "name": "flutter_native_splash",
-      "rootUri": "file:///C:/Users/moh/AppData/Local/Pub/Cache/hosted/pub.dev/flutter_native_splash-2.3.7",
+      "rootUri": "file:///C:/Users/moh/AppData/Local/Pub/Cache/hosted/pub.dev/flutter_native_splash-2.4.4",
       "packageUri": "lib/",
-      "languageVersion": "2.19"
+      "languageVersion": "3.0"
     },
     {
       "name": "flutter_test",
@@ -207,33 +255,33 @@
     },
     {
       "name": "geolocator",
-      "rootUri": "file:///C:/Users/moh/AppData/Local/Pub/Cache/hosted/pub.dev/geolocator-11.0.0",
+      "rootUri": "file:///C:/Users/moh/AppData/Local/Pub/Cache/hosted/pub.dev/geolocator-13.0.4",
       "packageUri": "lib/",
-      "languageVersion": "2.15"
+      "languageVersion": "3.5"
     },
     {
       "name": "geolocator_android",
-      "rootUri": "file:///C:/Users/moh/AppData/Local/Pub/Cache/hosted/pub.dev/geolocator_android-4.4.1",
+      "rootUri": "file:///C:/Users/moh/AppData/Local/Pub/Cache/hosted/pub.dev/geolocator_android-4.6.2",
       "packageUri": "lib/",
-      "languageVersion": "2.15"
+      "languageVersion": "3.5"
     },
     {
       "name": "geolocator_apple",
-      "rootUri": "file:///C:/Users/moh/AppData/Local/Pub/Cache/hosted/pub.dev/geolocator_apple-2.3.6",
+      "rootUri": "file:///C:/Users/moh/AppData/Local/Pub/Cache/hosted/pub.dev/geolocator_apple-2.3.13",
       "packageUri": "lib/",
-      "languageVersion": "2.15"
+      "languageVersion": "3.5"
     },
     {
       "name": "geolocator_platform_interface",
-      "rootUri": "file:///C:/Users/moh/AppData/Local/Pub/Cache/hosted/pub.dev/geolocator_platform_interface-4.2.2",
+      "rootUri": "file:///C:/Users/moh/AppData/Local/Pub/Cache/hosted/pub.dev/geolocator_platform_interface-4.2.6",
       "packageUri": "lib/",
-      "languageVersion": "2.15"
+      "languageVersion": "3.5"
     },
     {
       "name": "geolocator_web",
-      "rootUri": "file:///C:/Users/moh/AppData/Local/Pub/Cache/hosted/pub.dev/geolocator_web-3.0.0",
+      "rootUri": "file:///C:/Users/moh/AppData/Local/Pub/Cache/hosted/pub.dev/geolocator_web-4.1.3",
       "packageUri": "lib/",
-      "languageVersion": "2.15"
+      "languageVersion": "3.5"
     },
     {
       "name": "geolocator_windows",
@@ -261,9 +309,9 @@
     },
     {
       "name": "http",
-      "rootUri": "file:///C:/Users/moh/AppData/Local/Pub/Cache/hosted/pub.dev/http-1.1.0",
+      "rootUri": "file:///C:/Users/moh/AppData/Local/Pub/Cache/hosted/pub.dev/http-1.6.0",
       "packageUri": "lib/",
-      "languageVersion": "3.0"
+      "languageVersion": "3.4"
     },
     {
       "name": "http_parser",
@@ -273,21 +321,21 @@
     },
     {
       "name": "image",
-      "rootUri": "file:///C:/Users/moh/AppData/Local/Pub/Cache/hosted/pub.dev/image-4.1.7",
-      "packageUri": "lib/",
-      "languageVersion": "2.15"
-    },
-    {
-      "name": "internet_connection_checker_plus",
-      "rootUri": "file:///C:/Users/moh/AppData/Local/Pub/Cache/hosted/pub.dev/internet_connection_checker_plus-2.2.0",
+      "rootUri": "file:///C:/Users/moh/AppData/Local/Pub/Cache/hosted/pub.dev/image-4.5.4",
       "packageUri": "lib/",
       "languageVersion": "3.0"
     },
     {
-      "name": "intl",
-      "rootUri": "file:///C:/Users/moh/AppData/Local/Pub/Cache/hosted/pub.dev/intl-0.18.1",
+      "name": "internet_connection_checker_plus",
+      "rootUri": "file:///C:/Users/moh/AppData/Local/Pub/Cache/hosted/pub.dev/internet_connection_checker_plus-2.9.1+2",
       "packageUri": "lib/",
-      "languageVersion": "2.12"
+      "languageVersion": "2.15"
+    },
+    {
+      "name": "intl",
+      "rootUri": "file:///C:/Users/moh/AppData/Local/Pub/Cache/hosted/pub.dev/intl-0.20.2",
+      "packageUri": "lib/",
+      "languageVersion": "3.3"
     },
     {
       "name": "js",
@@ -297,9 +345,9 @@
     },
     {
       "name": "json_annotation",
-      "rootUri": "file:///C:/Users/moh/AppData/Local/Pub/Cache/hosted/pub.dev/json_annotation-4.8.1",
+      "rootUri": "file:///C:/Users/moh/AppData/Local/Pub/Cache/hosted/pub.dev/json_annotation-4.9.0",
       "packageUri": "lib/",
-      "languageVersion": "2.19"
+      "languageVersion": "3.0"
     },
     {
       "name": "keyboard_actions",
@@ -326,22 +374,28 @@
       "languageVersion": "3.2"
     },
     {
-      "name": "location",
-      "rootUri": "file:///C:/Users/moh/AppData/Local/Pub/Cache/hosted/pub.dev/location-5.0.3",
+      "name": "lints",
+      "rootUri": "file:///C:/Users/moh/AppData/Local/Pub/Cache/hosted/pub.dev/lints-5.1.1",
       "packageUri": "lib/",
-      "languageVersion": "2.18"
+      "languageVersion": "3.6"
+    },
+    {
+      "name": "location",
+      "rootUri": "file:///C:/Users/moh/AppData/Local/Pub/Cache/hosted/pub.dev/location-7.0.1",
+      "packageUri": "lib/",
+      "languageVersion": "3.4"
     },
     {
       "name": "location_platform_interface",
-      "rootUri": "file:///C:/Users/moh/AppData/Local/Pub/Cache/hosted/pub.dev/location_platform_interface-3.1.2",
+      "rootUri": "file:///C:/Users/moh/AppData/Local/Pub/Cache/hosted/pub.dev/location_platform_interface-5.0.0",
       "packageUri": "lib/",
-      "languageVersion": "2.18"
+      "languageVersion": "3.4"
     },
     {
       "name": "location_web",
-      "rootUri": "file:///C:/Users/moh/AppData/Local/Pub/Cache/hosted/pub.dev/location_web-4.2.0",
+      "rootUri": "file:///C:/Users/moh/AppData/Local/Pub/Cache/hosted/pub.dev/location_web-5.0.4",
       "packageUri": "lib/",
-      "languageVersion": "2.18"
+      "languageVersion": "3.4"
     },
     {
       "name": "matcher",
@@ -369,7 +423,49 @@
     },
     {
       "name": "open_file",
-      "rootUri": "file:///C:/Users/moh/AppData/Local/Pub/Cache/hosted/pub.dev/open_file-3.3.2",
+      "rootUri": "file:///C:/Users/moh/AppData/Local/Pub/Cache/hosted/pub.dev/open_file-3.5.11",
+      "packageUri": "lib/",
+      "languageVersion": "2.17"
+    },
+    {
+      "name": "open_file_android",
+      "rootUri": "file:///C:/Users/moh/AppData/Local/Pub/Cache/hosted/pub.dev/open_file_android-1.0.6",
+      "packageUri": "lib/",
+      "languageVersion": "2.17"
+    },
+    {
+      "name": "open_file_ios",
+      "rootUri": "file:///C:/Users/moh/AppData/Local/Pub/Cache/hosted/pub.dev/open_file_ios-1.0.4",
+      "packageUri": "lib/",
+      "languageVersion": "2.17"
+    },
+    {
+      "name": "open_file_linux",
+      "rootUri": "file:///C:/Users/moh/AppData/Local/Pub/Cache/hosted/pub.dev/open_file_linux-0.0.5",
+      "packageUri": "lib/",
+      "languageVersion": "2.17"
+    },
+    {
+      "name": "open_file_mac",
+      "rootUri": "file:///C:/Users/moh/AppData/Local/Pub/Cache/hosted/pub.dev/open_file_mac-1.0.4",
+      "packageUri": "lib/",
+      "languageVersion": "2.17"
+    },
+    {
+      "name": "open_file_platform_interface",
+      "rootUri": "file:///C:/Users/moh/AppData/Local/Pub/Cache/hosted/pub.dev/open_file_platform_interface-1.0.3",
+      "packageUri": "lib/",
+      "languageVersion": "2.17"
+    },
+    {
+      "name": "open_file_web",
+      "rootUri": "file:///C:/Users/moh/AppData/Local/Pub/Cache/hosted/pub.dev/open_file_web-0.0.4",
+      "packageUri": "lib/",
+      "languageVersion": "2.17"
+    },
+    {
+      "name": "open_file_windows",
+      "rootUri": "file:///C:/Users/moh/AppData/Local/Pub/Cache/hosted/pub.dev/open_file_windows-0.0.3",
       "packageUri": "lib/",
       "languageVersion": "2.17"
     },
@@ -387,15 +483,15 @@
     },
     {
       "name": "path_provider",
-      "rootUri": "file:///C:/Users/moh/AppData/Local/Pub/Cache/hosted/pub.dev/path_provider-2.1.2",
+      "rootUri": "file:///C:/Users/moh/AppData/Local/Pub/Cache/hosted/pub.dev/path_provider-2.1.5",
       "packageUri": "lib/",
-      "languageVersion": "3.0"
+      "languageVersion": "3.4"
     },
     {
       "name": "path_provider_android",
-      "rootUri": "file:///C:/Users/moh/AppData/Local/Pub/Cache/hosted/pub.dev/path_provider_android-2.2.2",
+      "rootUri": "file:///C:/Users/moh/AppData/Local/Pub/Cache/hosted/pub.dev/path_provider_android-2.2.19",
       "packageUri": "lib/",
-      "languageVersion": "3.0"
+      "languageVersion": "3.7"
     },
     {
       "name": "path_provider_foundation",
@@ -423,45 +519,51 @@
     },
     {
       "name": "pdf",
-      "rootUri": "file:///C:/Users/moh/AppData/Local/Pub/Cache/hosted/pub.dev/pdf-3.10.8",
+      "rootUri": "file:///C:/Users/moh/AppData/Local/Pub/Cache/hosted/pub.dev/pdf-3.11.3",
+      "packageUri": "lib/",
+      "languageVersion": "2.19"
+    },
+    {
+      "name": "permission_handler",
+      "rootUri": "file:///C:/Users/moh/AppData/Local/Pub/Cache/hosted/pub.dev/permission_handler-11.4.0",
+      "packageUri": "lib/",
+      "languageVersion": "3.5"
+    },
+    {
+      "name": "permission_handler_android",
+      "rootUri": "file:///C:/Users/moh/AppData/Local/Pub/Cache/hosted/pub.dev/permission_handler_android-12.1.0",
+      "packageUri": "lib/",
+      "languageVersion": "3.5"
+    },
+    {
+      "name": "permission_handler_apple",
+      "rootUri": "file:///C:/Users/moh/AppData/Local/Pub/Cache/hosted/pub.dev/permission_handler_apple-9.4.7",
       "packageUri": "lib/",
       "languageVersion": "2.18"
     },
     {
-      "name": "permission_handler",
-      "rootUri": "file:///C:/Users/moh/AppData/Local/Pub/Cache/hosted/pub.dev/permission_handler-11.0.1",
+      "name": "permission_handler_html",
+      "rootUri": "file:///C:/Users/moh/AppData/Local/Pub/Cache/hosted/pub.dev/permission_handler_html-0.1.3+5",
       "packageUri": "lib/",
-      "languageVersion": "2.15"
-    },
-    {
-      "name": "permission_handler_android",
-      "rootUri": "file:///C:/Users/moh/AppData/Local/Pub/Cache/hosted/pub.dev/permission_handler_android-11.1.0",
-      "packageUri": "lib/",
-      "languageVersion": "2.15"
-    },
-    {
-      "name": "permission_handler_apple",
-      "rootUri": "file:///C:/Users/moh/AppData/Local/Pub/Cache/hosted/pub.dev/permission_handler_apple-9.1.4",
-      "packageUri": "lib/",
-      "languageVersion": "2.15"
+      "languageVersion": "3.3"
     },
     {
       "name": "permission_handler_platform_interface",
-      "rootUri": "file:///C:/Users/moh/AppData/Local/Pub/Cache/hosted/pub.dev/permission_handler_platform_interface-3.12.0",
+      "rootUri": "file:///C:/Users/moh/AppData/Local/Pub/Cache/hosted/pub.dev/permission_handler_platform_interface-4.3.0",
       "packageUri": "lib/",
-      "languageVersion": "2.14"
+      "languageVersion": "3.5"
     },
     {
       "name": "permission_handler_windows",
-      "rootUri": "file:///C:/Users/moh/AppData/Local/Pub/Cache/hosted/pub.dev/permission_handler_windows-0.1.3",
+      "rootUri": "file:///C:/Users/moh/AppData/Local/Pub/Cache/hosted/pub.dev/permission_handler_windows-0.2.1",
       "packageUri": "lib/",
       "languageVersion": "2.12"
     },
     {
       "name": "petitparser",
-      "rootUri": "file:///C:/Users/moh/AppData/Local/Pub/Cache/hosted/pub.dev/petitparser-5.4.0",
+      "rootUri": "file:///C:/Users/moh/AppData/Local/Pub/Cache/hosted/pub.dev/petitparser-6.1.0",
       "packageUri": "lib/",
-      "languageVersion": "2.19"
+      "languageVersion": "3.5"
     },
     {
       "name": "platform",
@@ -476,12 +578,6 @@
       "languageVersion": "3.0"
     },
     {
-      "name": "pointycastle",
-      "rootUri": "file:///C:/Users/moh/AppData/Local/Pub/Cache/hosted/pub.dev/pointycastle-3.7.4",
-      "packageUri": "lib/",
-      "languageVersion": "3.0"
-    },
-    {
       "name": "qr",
       "rootUri": "file:///C:/Users/moh/AppData/Local/Pub/Cache/hosted/pub.dev/qr-3.0.1",
       "packageUri": "lib/",
@@ -492,6 +588,54 @@
       "rootUri": "file:///C:/Users/moh/AppData/Local/Pub/Cache/hosted/pub.dev/rational-2.2.2",
       "packageUri": "lib/",
       "languageVersion": "2.14"
+    },
+    {
+      "name": "rxdart",
+      "rootUri": "file:///C:/Users/moh/AppData/Local/Pub/Cache/hosted/pub.dev/rxdart-0.28.0",
+      "packageUri": "lib/",
+      "languageVersion": "2.12"
+    },
+    {
+      "name": "shared_preferences",
+      "rootUri": "file:///C:/Users/moh/AppData/Local/Pub/Cache/hosted/pub.dev/shared_preferences-2.5.3",
+      "packageUri": "lib/",
+      "languageVersion": "3.5"
+    },
+    {
+      "name": "shared_preferences_android",
+      "rootUri": "file:///C:/Users/moh/AppData/Local/Pub/Cache/hosted/pub.dev/shared_preferences_android-2.4.13",
+      "packageUri": "lib/",
+      "languageVersion": "3.7"
+    },
+    {
+      "name": "shared_preferences_foundation",
+      "rootUri": "file:///C:/Users/moh/AppData/Local/Pub/Cache/hosted/pub.dev/shared_preferences_foundation-2.5.4",
+      "packageUri": "lib/",
+      "languageVersion": "3.4"
+    },
+    {
+      "name": "shared_preferences_linux",
+      "rootUri": "file:///C:/Users/moh/AppData/Local/Pub/Cache/hosted/pub.dev/shared_preferences_linux-2.4.1",
+      "packageUri": "lib/",
+      "languageVersion": "3.3"
+    },
+    {
+      "name": "shared_preferences_platform_interface",
+      "rootUri": "file:///C:/Users/moh/AppData/Local/Pub/Cache/hosted/pub.dev/shared_preferences_platform_interface-2.4.1",
+      "packageUri": "lib/",
+      "languageVersion": "3.2"
+    },
+    {
+      "name": "shared_preferences_web",
+      "rootUri": "file:///C:/Users/moh/AppData/Local/Pub/Cache/hosted/pub.dev/shared_preferences_web-2.4.3",
+      "packageUri": "lib/",
+      "languageVersion": "3.4"
+    },
+    {
+      "name": "shared_preferences_windows",
+      "rootUri": "file:///C:/Users/moh/AppData/Local/Pub/Cache/hosted/pub.dev/shared_preferences_windows-2.4.1",
+      "packageUri": "lib/",
+      "languageVersion": "3.3"
     },
     {
       "name": "simple_gesture_detector",
@@ -537,9 +681,9 @@
     },
     {
       "name": "table_calendar",
-      "rootUri": "file:///C:/Users/moh/AppData/Local/Pub/Cache/hosted/pub.dev/table_calendar-3.0.9",
+      "rootUri": "file:///C:/Users/moh/AppData/Local/Pub/Cache/hosted/pub.dev/table_calendar-3.2.0",
       "packageUri": "lib/",
-      "languageVersion": "2.12"
+      "languageVersion": "3.0"
     },
     {
       "name": "term_glyph",
@@ -590,10 +734,16 @@
       "languageVersion": "3.3"
     },
     {
-      "name": "win32",
-      "rootUri": "file:///C:/Users/moh/AppData/Local/Pub/Cache/hosted/pub.dev/win32-5.1.1",
+      "name": "web",
+      "rootUri": "file:///C:/Users/moh/AppData/Local/Pub/Cache/hosted/pub.dev/web-1.1.1",
       "packageUri": "lib/",
-      "languageVersion": "3.1"
+      "languageVersion": "3.4"
+    },
+    {
+      "name": "win32",
+      "rootUri": "file:///C:/Users/moh/AppData/Local/Pub/Cache/hosted/pub.dev/win32-5.5.4",
+      "packageUri": "lib/",
+      "languageVersion": "3.4"
     },
     {
       "name": "xdg_directories",
@@ -603,9 +753,9 @@
     },
     {
       "name": "xml",
-      "rootUri": "file:///C:/Users/moh/AppData/Local/Pub/Cache/hosted/pub.dev/xml-6.3.0",
+      "rootUri": "file:///C:/Users/moh/AppData/Local/Pub/Cache/hosted/pub.dev/xml-6.5.0",
       "packageUri": "lib/",
-      "languageVersion": "2.19"
+      "languageVersion": "3.2"
     },
     {
       "name": "yaml",
@@ -617,10 +767,10 @@
       "name": "siot_driver_pro",
       "rootUri": "../",
       "packageUri": "lib/",
-      "languageVersion": "3.1"
+      "languageVersion": "3.7"
     }
   ],
-  "generated": "2025-10-31T07:41:20.184990Z",
+  "generated": "2026-05-06T21:26:24.469458Z",
   "generator": "pub",
   "generatorVersion": "3.7.2",
   "flutterRoot": "file:///C:/FlutterDev/flutter",

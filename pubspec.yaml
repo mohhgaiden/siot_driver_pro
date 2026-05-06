@@ -1,76 +1,57 @@
 name: siot_driver_pro
 description: A new Flutter project.
 publish_to: 'none'
-
-<<<<<<< HEAD
-version: 1.0.0+1
-
-environment:
-  sdk: '>=3.1.5 <4.0.0'
-=======
-version: 2.0.5+13
+version: 2.0.6+21
 
 environment:
   sdk: ^3.7.2
->>>>>>> edc460f (Initial commit)
 
 dependencies:
   flutter:
     sdk: flutter
-
-<<<<<<< HEAD
-  cupertino_icons: ^1.0.2
-=======
   cupertino_icons: ^1.0.8
->>>>>>> edc460f (Initial commit)
-  keyboard_actions:
-  http:
-  flutter_blue_plus:
-  location:
-  geolocator:
-  hive_flutter:
-  flutter_xlider:
-  flutter_local_notifications:
-  intl:
-  common_utils:
-<<<<<<< HEAD
-  bezier_chart_plus:
-=======
->>>>>>> edc460f (Initial commit)
-  table_calendar:
-  pdf:
-  path_provider:
-  open_file:
-  flutter_native_splash:
-  permission_handler:
-  internet_connection_checker_plus:
+  keyboard_actions: ^4.2.0
+  http: ^1.2.2
+  flutter_blue_plus: ^1.35.3
+  location: ^7.0.0
+  geolocator: ^13.0.2
+  hive_flutter: ^1.1.0
+  flutter_xlider: ^3.0.1
+  flutter_local_notifications: ^18.0.1
+  intl: ^0.20.2
+  common_utils: ^2.1.0
+  table_calendar: ^3.1.2
+  pdf: ^3.11.1
+  path_provider: ^2.1.5
+  flutter_native_splash: ^2.4.4
+  permission_handler: ^11.3.1
+  internet_connection_checker_plus: ^2.6.0
+  open_file: ^3.5.11
+  flutter_foreground_task: ^6.1.2
+
+dependency_overrides:
+  win32: 5.5.4
+  archive: 3.6.1
 
 flutter_native_splash:
   android: true
   ios: false
   web: false
   color: "#FFFFFF"
-  image: "assets/images/ic_launcher-playstore.png"
+  image: "assets/images/login/logo_light.png"
 
 dev_dependencies:
   flutter_test:
     sdk: flutter
-  flutter_launcher_icons: 
+  flutter_launcher_icons: ^0.14.3
+  flutter_lints: ^5.0.0
 
 flutter_icons:
   android: true
-  image_path: "assets/images/ic_launcher-playstore.png"
-
-<<<<<<< HEAD
-  flutter_lints: ^2.0.0
-=======
-  flutter_lints: ^5.0.0
->>>>>>> edc460f (Initial commit)
+  image_path: "assets/images/login/logo_dark.png"
 
 flutter:
-
   uses-material-design: true
-
   assets:
     - assets/images/
     - assets/images/login/
@@ -79,7 +60,6 @@ flutter:
     - assets/images/home/
     - assets/images/profile/
     - assets/images/stats/
-
   fonts:
     - family: RobotoThin
       fonts:
