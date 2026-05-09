@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter_blue_plus/flutter_blue_plus.dart';
 import 'package:hive_flutter/hive_flutter.dart';
@@ -16,18 +17,6 @@ class MainScreen extends StatefulWidget {
   State<MainScreen> createState() => _MainScreenState();
 }
 
-<<<<<<< HEAD
-class _MainScreenState extends State<MainScreen> { 
-
-  late Timer timer; int seconds = 1;bool gpsEnabled = true;
-  PermissionStatus permission = PermissionStatus.granted;
-  PermissionStatus notify = PermissionStatus.granted;
-  PermissionStatus background = PermissionStatus.granted; 
-  BluetoothAdapterState adapterState = BluetoothAdapterState.on;
-  late StreamSubscription<BluetoothAdapterState> adapterStateStateSubscription;
-
-  Future<void> checkLocation() async{
-=======
 class _MainScreenState extends State<MainScreen> {
   late Timer timer;
   int seconds = 1;
@@ -39,28 +28,18 @@ class _MainScreenState extends State<MainScreen> {
   late StreamSubscription<BluetoothAdapterState> adapterStateStateSubscription;
 
   Future<void> checkLocation() async {
->>>>>>> edc460f (Initial commit)
     location1.Location location = location1.Location();
     gpsEnabled = await location.serviceEnabled();
     notify = await Permission.notification.status;
     permission = await Permission.location.status;
-    background = await Permission.ignoreBatteryOptimizations.status;
+    if (Platform.isAndroid) {
+      background = await Permission.ignoreBatteryOptimizations.status;
+    }
     setState(() {});
   }
 
   @override
   void initState() {
-<<<<<<< HEAD
-    timer = Timer.periodic(const Duration(seconds: 1), (timer) { 
-      if(seconds>0){
-        setState(() {seconds--;});
-      }else{
-        checkLocation();
-        setState(() {seconds = 1;});
-      }
-    });
-    adapterStateStateSubscription = FlutterBluePlus.adapterState.listen((state) {
-=======
     timer = Timer.periodic(const Duration(seconds: 1), (timer) {
       if (seconds > 0) {
         setState(() {
@@ -76,7 +55,6 @@ class _MainScreenState extends State<MainScreen> {
     adapterStateStateSubscription = FlutterBluePlus.adapterState.listen((
       state,
     ) {
->>>>>>> edc460f (Initial commit)
       adapterState = state;
       if (mounted) {
         setState(() {});
@@ -88,17 +66,6 @@ class _MainScreenState extends State<MainScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-<<<<<<< HEAD
-      body: adapterState == BluetoothAdapterState.off 
-        ? BluetoothOffScreen(adapterState: adapterState)
-        : (!gpsEnabled || permission == PermissionStatus.denied) 
-        ? GpsOffScreen(gpsEnabled: gpsEnabled,permission: permission)
-        : (notify == PermissionStatus.denied || background == PermissionStatus.denied) ? NotifiOffScreen(notify: notify, background: background)
-        : Hive.box('LOGGED_IN_USER').length==0 ?LoginPage() :HomePage(),
-    );
-  }
-}
-=======
       body:
           adapterState == BluetoothAdapterState.off
               ? BluetoothOffScreen(adapterState: adapterState)
@@ -113,4 +80,3 @@ class _MainScreenState extends State<MainScreen> {
     );
   }
 }
->>>>>>> edc460f (Initial commit)

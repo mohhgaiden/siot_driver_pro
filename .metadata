@@ -4,11 +4,7 @@
 # This file should be version controlled and should not be manually edited.
 
 version:
-<<<<<<< HEAD
-  revision: "d211f42860350d914a5ad8102f9ec32764dc6d06"
-=======
-  revision: "c23637390482d4cf9598c3ce3f2be31aa7332daf"
->>>>>>> edc460f (Initial commit)
+  revision: "05db9689081f091050f01aed79f04dce0c750154"
   channel: "stable"
 
 project_type: app
@@ -17,46 +13,26 @@ project_type: app
 migration:
   platforms:
     - platform: root
-<<<<<<< HEAD
-      create_revision: d211f42860350d914a5ad8102f9ec32764dc6d06
-      base_revision: d211f42860350d914a5ad8102f9ec32764dc6d06
+      create_revision: 05db9689081f091050f01aed79f04dce0c750154
+      base_revision: 05db9689081f091050f01aed79f04dce0c750154
     - platform: android
-      create_revision: d211f42860350d914a5ad8102f9ec32764dc6d06
-      base_revision: d211f42860350d914a5ad8102f9ec32764dc6d06
+      create_revision: 05db9689081f091050f01aed79f04dce0c750154
+      base_revision: 05db9689081f091050f01aed79f04dce0c750154
     - platform: ios
-      create_revision: d211f42860350d914a5ad8102f9ec32764dc6d06
-      base_revision: d211f42860350d914a5ad8102f9ec32764dc6d06
+      create_revision: 05db9689081f091050f01aed79f04dce0c750154
+      base_revision: 05db9689081f091050f01aed79f04dce0c750154
     - platform: linux
-      create_revision: d211f42860350d914a5ad8102f9ec32764dc6d06
-      base_revision: d211f42860350d914a5ad8102f9ec32764dc6d06
+      create_revision: 05db9689081f091050f01aed79f04dce0c750154
+      base_revision: 05db9689081f091050f01aed79f04dce0c750154
     - platform: macos
-      create_revision: d211f42860350d914a5ad8102f9ec32764dc6d06
-      base_revision: d211f42860350d914a5ad8102f9ec32764dc6d06
+      create_revision: 05db9689081f091050f01aed79f04dce0c750154
+      base_revision: 05db9689081f091050f01aed79f04dce0c750154
     - platform: web
-      create_revision: d211f42860350d914a5ad8102f9ec32764dc6d06
-      base_revision: d211f42860350d914a5ad8102f9ec32764dc6d06
+      create_revision: 05db9689081f091050f01aed79f04dce0c750154
+      base_revision: 05db9689081f091050f01aed79f04dce0c750154
     - platform: windows
-      create_revision: d211f42860350d914a5ad8102f9ec32764dc6d06
-      base_revision: d211f42860350d914a5ad8102f9ec32764dc6d06
-=======
-      create_revision: c23637390482d4cf9598c3ce3f2be31aa7332daf
-      base_revision: c23637390482d4cf9598c3ce3f2be31aa7332daf
-    - platform: android
-      create_revision: c23637390482d4cf9598c3ce3f2be31aa7332daf
-      base_revision: c23637390482d4cf9598c3ce3f2be31aa7332daf
-    - platform: ios
-      create_revision: c23637390482d4cf9598c3ce3f2be31aa7332daf
-      base_revision: c23637390482d4cf9598c3ce3f2be31aa7332daf
-    - platform: linux
-      create_revision: c23637390482d4cf9598c3ce3f2be31aa7332daf
-      base_revision: c23637390482d4cf9598c3ce3f2be31aa7332daf
-    - platform: macos
-      create_revision: c23637390482d4cf9598c3ce3f2be31aa7332daf
-      base_revision: c23637390482d4cf9598c3ce3f2be31aa7332daf
-    - platform: web
-      create_revision: c23637390482d4cf9598c3ce3f2be31aa7332daf
-      base_revision: c23637390482d4cf9598c3ce3f2be31aa7332daf
->>>>>>> edc460f (Initial commit)
+      create_revision: 05db9689081f091050f01aed79f04dce0c750154
+      base_revision: 05db9689081f091050f01aed79f04dce0c750154
 
   # User provided section
 

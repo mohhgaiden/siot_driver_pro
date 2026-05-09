@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter_blue_plus/flutter_blue_plus.dart';
 import 'package:flutter_foreground_task/flutter_foreground_task.dart';
@@ -48,7 +49,7 @@ class _MainScreenState extends State<MainScreen> {
     }
 
     // Show the dialog and wait for user to tap Continue
-    if (mounted) {
+    if (Platform.isAndroid && mounted) {
       await showDialog(
         context: context,
         barrierDismissible: false, // user must tap the button
@@ -141,7 +142,12 @@ class _MainScreenState extends State<MainScreen> {
     gpsEnabled = await location.serviceEnabled();
     notify = await Permission.notification.status;
     permission = await Permission.location.status;
+    // Android only
+  if (Platform.isAndroid) {
     background = await Permission.ignoreBatteryOptimizations.status;
+  } else {
+    background = PermissionStatus.granted;
+  }
     setState(() {});
   }
 
@@ -192,9 +198,10 @@ class _MainScreenState extends State<MainScreen> {
               ? BluetoothOffScreen(adapterState: adapterState)
               : (!gpsEnabled || permission == PermissionStatus.denied)
               ? GpsOffScreen(gpsEnabled: gpsEnabled, permission: permission)
-              : (notify == PermissionStatus.denied ||
-                  background == PermissionStatus.denied)
-              ? NotifiOffScreen(notify: notify, background: background)
+              : ((notify.isDenied || notify.isPermanentlyDenied) ||
+    (Platform.isAndroid &&
+        (background.isDenied || background.isPermanentlyDenied)))
+? NotifiOffScreen(notify: notify, background: background)
               : Hive.box('LOGGED_IN_USER').length == 0
               ? LoginPage()
               : HomePage(),
