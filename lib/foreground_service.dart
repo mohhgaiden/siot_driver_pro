@@ -1,10 +1,8 @@
 import 'dart:async';
 import 'dart:isolate';
 import 'dart:io';
-
 import 'package:flutter_foreground_task/flutter_foreground_task.dart';
 import 'package:flutter_blue_plus/flutter_blue_plus.dart';
-
 import 'ble_background_service.dart';
 
 class BleTaskHandler extends TaskHandler {
@@ -15,24 +13,22 @@ class BleTaskHandler extends TaskHandler {
     DateTime timestamp,
     SendPort? sendPort,
   ) async {
-    // ✅ NEVER RUN ON IOS
+    // Hard guard — this handler must never run on iOS
     if (!Platform.isAndroid) return;
 
     try {
-      // Start BLE scanning
       await FlutterBluePlus.startScan();
-
       _scanSub = FlutterBluePlus.scanResults.listen(
         (results) async {
           try {
             await BleBackgroundService.storeSensorReadings(results);
           } catch (e) {
-            print('BLE STORE ERROR: $e');
+            debugPrint('BLE STORE ERROR: $e');
           }
         },
       );
     } catch (e) {
-      print('BLE SCAN ERROR: $e');
+      debugPrint('BLE SCAN ERROR: $e');
     }
   }
 
@@ -41,8 +37,8 @@ class BleTaskHandler extends TaskHandler {
     DateTime timestamp,
     SendPort? sendPort,
   ) async {
+    if (!Platform.isAndroid) return;
     await _scanSub?.cancel();
-
     try {
       await FlutterBluePlus.stopScan();
     } catch (_) {}
