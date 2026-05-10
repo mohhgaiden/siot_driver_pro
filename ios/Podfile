@@ -47,9 +47,10 @@ post_install do |installer|
     target.build_configurations.each do |config|
       config.build_settings['IPHONEOS_DEPLOYMENT_TARGET'] = '13.0'
       config.build_settings["EXCLUDED_ARCHS[sdk=iphonesimulator*]"] = "arm64"
-
-      # Swift version required by some BLE/foreground plugins
       config.build_settings['SWIFT_VERSION'] = '5.0'
+
+      # ✅ Suppress deprecation warnings from third-party pods
+      config.build_settings['GCC_WARN_ABOUT_DEPRECATED_FUNCTIONS'] = 'NO'
 
       config.build_settings['GCC_PREPROCESSOR_DEFINITIONS'] ||= [
         '$(inherited)',
@@ -61,3 +62,10 @@ post_install do |installer|
     end
   end
 end
+Summary
+Error	Fix
+debugPrint not found in BleTaskHandler	Add import 'package:flutter/foundation.dart'
+UIAlertView deprecated (location plugin)	Suppress with GCC_WARN_ABOUT_DEPRECATED_FUNCTIONS = NO in Podfile
+UI_USER_INTERFACE_IDIOM deprecated (open_file_ios)	Same suppression above
+
+
