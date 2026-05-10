@@ -3,7 +3,7 @@ import 'dart:isolate';
 import 'dart:io';
 import 'package:flutter_foreground_task/flutter_foreground_task.dart';
 import 'package:flutter_blue_plus/flutter_blue_plus.dart';
-import 'ble_background_service.dart';
+import 'ble_background_service.dart';import 'package:flutter/foundation.dart';
 
 class BleTaskHandler extends TaskHandler {
   StreamSubscription<List<ScanResult>>? _scanSub;
