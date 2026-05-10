@@ -1,9 +1,9 @@
 import 'dart:async';
 import 'dart:isolate';
+import 'dart:io';
 
 import 'package:flutter_foreground_task/flutter_foreground_task.dart';
 import 'package:flutter_blue_plus/flutter_blue_plus.dart';
-import 'package:hive_flutter/hive_flutter.dart';
 
 import 'ble_background_service.dart';
 
@@ -11,31 +11,46 @@ class BleTaskHandler extends TaskHandler {
   StreamSubscription<List<ScanResult>>? _scanSub;
 
   @override
-  void onStart(DateTime timestamp, SendPort? sendPort) async {
-    await _initHive();
+  Future<void> onStart(
+    DateTime timestamp,
+    SendPort? sendPort,
+  ) async {
+    // ✅ NEVER RUN ON IOS
+    if (!Platform.isAndroid) return;
 
-    FlutterBluePlus.startScan();
+    try {
+      // Start BLE scanning
+      await FlutterBluePlus.startScan();
 
-    _scanSub = FlutterBluePlus.scanResults.listen((results) async {
-      // 🚀 THIS IS YOUR BACKGROUND LOGIC
-      await BleBackgroundService.storeSensorReadings(results);
-    });
+      _scanSub = FlutterBluePlus.scanResults.listen(
+        (results) async {
+          try {
+            await BleBackgroundService.storeSensorReadings(results);
+          } catch (e) {
+            print('BLE STORE ERROR: $e');
+          }
+        },
+      );
+    } catch (e) {
+      print('BLE SCAN ERROR: $e');
+    }
   }
 
   @override
-  void onDestroy(DateTime timestamp, SendPort? sendPort) {
-    _scanSub?.cancel();
+  Future<void> onDestroy(
+    DateTime timestamp,
+    SendPort? sendPort,
+  ) async {
+    await _scanSub?.cancel();
+
+    try {
+      await FlutterBluePlus.stopScan();
+    } catch (_) {}
   }
 
   @override
-  void onRepeatEvent(DateTime timestamp, SendPort? sendPort) {}
-
-  Future<void> _initHive() async {
-    await Hive.initFlutter();
-
-    await Hive.openBox('LOGGED_IN_USER');
-    await Hive.openBox('LIST_CAPTEURS');
-    await Hive.openBox('SENSOR_READ');
-    await Hive.openBox('SENSOR_READ1');
-  }
+  void onRepeatEvent(
+    DateTime timestamp,
+    SendPort? sendPort,
+  ) {}
 }
