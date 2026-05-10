@@ -62,10 +62,5 @@ post_install do |installer|
     end
   end
 end
-Summary
-Error	Fix
-debugPrint not found in BleTaskHandler	Add import 'package:flutter/foundation.dart'
-UIAlertView deprecated (location plugin)	Suppress with GCC_WARN_ABOUT_DEPRECATED_FUNCTIONS = NO in Podfile
-UI_USER_INTERFACE_IDIOM deprecated (open_file_ios)	Same suppression above
 
 
