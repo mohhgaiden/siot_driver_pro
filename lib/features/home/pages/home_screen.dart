@@ -1,6 +1,8 @@
 ﻿import 'dart:async';
 import 'dart:convert';
+import 'dart:io' show Platform;
 
+import 'package:flutter/foundation.dart' show kDebugMode;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_blue_plus/flutter_blue_plus.dart';
@@ -15,6 +17,7 @@ import '../../../common/popup_window.dart';
 import '../../../core/constants/dimens.dart';
 import '../../../core/constants/gaps.dart';
 import '../../../core/constants/styles.dart';
+import '../../../core/services/capteur_sync.dart';
 import '../../../core/utils/notification.dart';
 import '../../../main.dart';
 import '../widgets/goods_add_menu.dart';
@@ -46,6 +49,34 @@ abstract class _Api {
       'https://sirius-iot.app/Admin/Mobile/API/SiotDriver2022/Android/sensor_activity_start_end.php';
 }
 
+// ─── Tri d'affichage des capteurs ─────────────────────────────────────────────
+
+/// Modes de tri proposés à l'utilisateur dans la liste "Mes Capteurs".
+enum _SensorSort {
+  nameAsc('Nom (A → Z)', Icons.arrow_downward_rounded),
+  nameDesc('Nom (Z → A)', Icons.arrow_upward_rounded),
+  proximity('Proximité', Icons.signal_cellular_alt_rounded),
+  lastSeen('Dernière lecture', Icons.access_time_rounded);
+
+  const _SensorSort(this.label, this.icon);
+  final String label;
+  final IconData icon;
+}
+
+/// Tuple temporaire utilisé pour trier la liste des capteurs avant rendu.
+class _SensorEntry {
+  _SensorEntry({
+    required this.result,
+    required this.name,
+    required this.type,
+    required this.sensorType,
+  });
+  final ScanResult result;
+  final String name;
+  final String type;
+  final SensorType sensorType;
+}
+
 class HomePage extends StatefulWidget {
   const HomePage({super.key});
 
@@ -66,12 +97,17 @@ class _HomePageState extends State<HomePage> {
   Map _user = {};
   String _userId = '';
   final Set<String> _dedupCache = {};
+  // Dernier timestamp d'écriture par MAC (clé en lower-case),
+  // pour respecter interval_stockage entre deux écritures.
+  final Map<String, int> _lastWriteMs = {};
 
   // ─── State ───────────────────────────────────────────────────────────────────
   final GlobalKey _settingsKey = GlobalKey();
   List<ScanResult> _scanResults = [];
   List<Map<String, dynamic>> _alertCache = [];
   bool _missionStarted = false;
+  // Tri d'affichage des capteurs (persisté dans `_userBox` sous `sort_mode`).
+  _SensorSort _sortMode = _SensorSort.nameAsc;
 
   // ─── Per-device alert tracking ───────────────────────────────────────────────
   final Map<String, DateTime> _lastNotificationPerDevice = {};
@@ -99,10 +135,23 @@ class _HomePageState extends State<HomePage> {
     startBleService();
     _user = _userBox.getAt(0) as Map;
     _userId = _user['uuid_user'] as String;
+    // Charge le tri d'affichage sauvegardé (ex. "nameDesc"). Si la valeur
+    // n'existe pas ou est invalide, on garde le défaut (nameAsc).
+    final savedSort = _user['sort_mode']?.toString();
+    if (savedSort != null) {
+      _sortMode = _SensorSort.values.firstWhere(
+        (s) => s.name == savedSort,
+        orElse: () => _SensorSort.nameAsc,
+      );
+    }
     _checkPendingMission();
     _startBluetooth();
     _refreshData();
     _updateLocation();
+
+    // ✅ Re-sync de la liste des capteurs à chaque ouverture de l'app
+    // (cas auto-login : on saute LoginPage donc _listCapteur n'est pas appelé)
+    _syncCapteurs();
 
     _connectTimer = Timer.periodic(
       const Duration(seconds: 10),
@@ -115,7 +164,14 @@ class _HomePageState extends State<HomePage> {
     ); // reacts to profile changes
   }
 
+  Future<void> _syncCapteurs() async {
+    await CapteurSync.sync(_userId);
+    // Après la sync, on rafraîchit l'UI avec les nouvelles alertes
+    if (mounted) _refreshData();
+  }
+
   Future<void> startBleService() async {
+    if (!Platform.isAndroid) return;
     if (await FlutterForegroundTask.isRunningService) return;
 
     await FlutterForegroundTask.startService(
@@ -144,27 +200,42 @@ class _HomePageState extends State<HomePage> {
     }
   }
 
+  /// Décode `interval_affichage` (clé Hive) en `Duration`.
+  ///
+  /// Nouveau format : valeur stockée en **secondes** (ex. "60", "300").
+  /// Ancien format (legacy) : valeur stockée en **minutes** (ex. "5").
+  /// Pour rester compatible, toute valeur `< 30` est traitée comme du legacy
+  /// (multiplication par 60). 30 est le minimum proposé dans le picker.
+  /// Défaut : 60 s (= 1 minute).
+  static Duration _decodeAffichage(String? raw) {
+    final n = int.tryParse(raw ?? '') ?? 60;
+    return n < 30 ? Duration(minutes: n) : Duration(seconds: n);
+  }
+
   void _applyIntervalTimers() {
     _refreshTimer?.cancel();
     _storeTimer?.cancel();
 
-    final refreshInterval =
-        int.tryParse(_user['interval_affichage']?.toString() ?? '5') ?? 5;
+    final refresh = _decodeAffichage(_user['interval_affichage']?.toString());
     final storeInterval =
         int.tryParse(_user['interval_stockage']?.toString() ?? '5') ??
         5; // ← fixed key
 
-    _refreshTimer = Timer.periodic(Duration(minutes: refreshInterval), (_) {
+    _refreshTimer = Timer.periodic(refresh, (_) {
       _updateLocation();
       _refreshData();
     });
+    // ✅ Tick toutes les 30 s — la décision d'écrire ou non se fait
+    // dans _storeSensorReadings selon interval_stockage (cache _lastWriteMs).
     _storeTimer = Timer.periodic(
-      Duration(minutes: storeInterval),
+      const Duration(seconds: 30),
       (_) => _storeSensorReadings(_scanResults),
     );
+    debugPrint('⏱ Store timer = 30 s tick, '
+        'interval_stockage utilisateur = $storeInterval min');
 
     debugPrint(
-      '⏱ Timers set — refresh: ${refreshInterval}min | store: ${storeInterval}min',
+      '⏱ Timers set — refresh: ${refresh.inSeconds}s | store: ${storeInterval}min',
     );
   }
 
@@ -175,25 +246,129 @@ class _HomePageState extends State<HomePage> {
     _connectTimer?.cancel();
     _refreshTimer?.cancel();
     _storeTimer?.cancel();
+    _scanWatchdog?.cancel();
+    _scanRestartTimer?.cancel();
     super.dispose();
   }
 
   // ─── Bluetooth ───────────────────────────────────────────────────────────────
 
+  // Watchdog & restart périodique du scan BLE
+  Timer? _scanWatchdog;
+  Timer? _scanRestartTimer;
+  DateTime _lastScanRestart = DateTime.now();
+
+  Future<void> _restartScanSafely() async {
+    try {
+      await FlutterBluePlus.stopScan();
+      await Future.delayed(const Duration(milliseconds: 200));
+      await FlutterBluePlus.startScan();
+      _lastScanRestart = DateTime.now();
+      debugPrint('🔄 BLE scan restarted at $_lastScanRestart');
+    } catch (e) {
+      debugPrint('⚠️ Failed to restart BLE scan: $e');
+    }
+  }
+
   void _startBluetooth() {
-    DateTime lastUiUpdate = DateTime.now();
+    // ⚠️ `null` au démarrage → le premier scan déclenche systématiquement
+    // un `setState` (sinon l'utilisateur attendrait `interval_affichage`
+    // avant de voir la moindre valeur).
+    DateTime? lastUiUpdate;
+    // ⚠️ Set des MAC déjà affichés dans la liste : si un nouveau capteur
+    // apparaît à l'intérieur d'une fenêtre de throttle, on bypass le
+    // throttle pour qu'il s'affiche immédiatement (sinon il faudrait
+    // attendre la fin du cycle pour le voir).
+    final knownMacs = <String>{};
 
     FlutterBluePlus.startScan();
+    _lastScanRestart = DateTime.now();
+
+    // 🔁 Watchdog : vérifie toutes les 30 s que le scan tourne, relance sinon
+    _scanWatchdog?.cancel();
+    _scanWatchdog = Timer.periodic(const Duration(seconds: 30), (_) async {
+      final isScanning = FlutterBluePlus.isScanningNow;
+      if (!isScanning) {
+        debugPrint('⚠️ BLE scan était arrêté, relance');
+        await _restartScanSafely();
+      }
+    });
+
+    // 🔁 Force un redémarrage complet toutes les 5 min — évite la dégradation
+    // BLE Android sur scans longs sans filtre.
+    _scanRestartTimer?.cancel();
+    _scanRestartTimer = Timer.periodic(
+      const Duration(minutes: 5),
+      (_) => _restartScanSafely(),
+    );
+
     _scanSub = FlutterBluePlus.scanResults.listen((results) {
       final now = DateTime.now();
 
-      // 🔥 Only update UI every 1 second
-      if (now.difference(lastUiUpdate).inMilliseconds < 1000) {
-        _checkAlertsRealTime(results); // keep alerts realtime
+      // 🔥 Throttle l'affichage des valeurs capteurs selon l'intervalle
+      // défini dans Profil → "Affichage rafraîchissement écran"
+      // (clé Hive `interval_affichage`).
+      //
+      // ⚠️ On lit la valeur dynamiquement à chaque tick : si l'utilisateur
+      // modifie le réglage dans le profil, la nouvelle cadence est prise
+      // en compte immédiatement (pas besoin de redémarrer l'app).
+      //
+      // Les alertes (`_checkAlertsRealTime`) sont volontairement appelées
+      // hors du throttle pour rester réactives à tout dépassement de seuil.
+      var throttle = _decodeAffichage(_user['interval_affichage']?.toString());
+      // Plancher de sécurité : minimum 1 seconde, pour éviter de spammer
+      // le setState si la valeur n'est pas correctement renseignée.
+      if (throttle.inSeconds <= 0) {
+        throttle = const Duration(seconds: 1);
+      }
+
+      // Détection de nouveaux capteurs (MAC jamais vu dans cette session BLE).
+      // Tant qu'un nouveau capteur apparaît, on contourne le throttle pour
+      // l'afficher immédiatement.
+      final currentMacs = results
+          .map((r) => r.device.remoteId.str.toLowerCase())
+          .toSet();
+      final hasNewDevice =
+          currentMacs.any((m) => !knownMacs.contains(m));
+
+      // Premier scan, throttle écoulé, OU nouveau capteur → on rafraîchit.
+      // Sinon on garde les anciennes valeurs et on ne traite que les alertes.
+      if (lastUiUpdate != null &&
+          !hasNewDevice &&
+          now.difference(lastUiUpdate!) < throttle) {
+        _checkAlertsRealTime(results); // alertes toujours temps réel
         return;
       }
 
+      knownMacs.addAll(currentMacs);
       lastUiUpdate = now;
+
+      // 🔍 DIAGNOSTIC — actif uniquement en mode debug.
+      // Imprime tout ce que les capteurs BLE diffusent pour repérer
+      // les nouveaux modèles (ex. ELA T-probe).
+      // ⚠️ La compilation tree-shake ce bloc en release grâce à `kDebugMode`.
+      if (kDebugMode) {
+        for (final r in results) {
+          final adv = r.advertisementData;
+          final name = adv.advName.isNotEmpty
+              ? adv.advName
+              : r.device.platformName;
+          final mfg = adv.manufacturerData.entries
+              .map((e) =>
+                  'id=${e.key} (0x${e.key.toRadixString(16)}) '
+                  'data=${e.value.map((b) => b.toRadixString(16).padLeft(2, '0')).join()}')
+              .join(' | ');
+          final svc = adv.serviceData.entries
+              .map((e) =>
+                  'uuid=${e.key} '
+                  'data=${e.value.map((b) => b.toRadixString(16).padLeft(2, '0')).join()}')
+              .join(' | ');
+          debugPrint(
+            '🔎 BLE name="$name" mac=${r.device.remoteId.str} rssi=${r.rssi} '
+            'mfg=[$mfg] svc=[$svc]',
+          );
+        }
+      }
 
       if (mounted) {
         setState(() => _scanResults = results);
@@ -298,8 +473,8 @@ class _HomePageState extends State<HomePage> {
         final raw = _capteursBox.getAt(j);
         if (raw == null) continue;
 
-        final capteurMac = raw['MacAddrs']?.toString() ?? '';
-        if (capteurMac != mac) continue;
+        final capteurMac = (raw['MacAddrs']?.toString() ?? '').trim();
+        if (capteurMac.toLowerCase() != mac.toLowerCase()) continue;
 
         final typeStr = raw['Type']?.toString() ?? '';
         final sensorName = raw['Name']?.toString() ?? '';
@@ -391,22 +566,28 @@ class _HomePageState extends State<HomePage> {
   // ─── Sensor data storage ──────────────────────────────────────────────────────
 
   Future<void> _storeSensorReadings(List<ScanResult> scans) async {
+    if (scans.isEmpty) return;
+
+    // Intervalle utilisateur (en minutes) → ms. Default : 1 min.
+    final intervalMin =
+        int.tryParse(_user['interval_stockage']?.toString() ?? '1') ?? 1;
+    final minIntervalMs = intervalMin * 60 * 1000;
+    final nowMs = DateTime.now().millisecondsSinceEpoch;
+
     for (final result in scans) {
       final mac = result.device.remoteId.str;
-      final timestamp = result.timeStamp.millisecondsSinceEpoch;
+      final macKey = mac.toLowerCase();
 
-      // 🔥 UNIQUE KEY
-      final uniqueKey = '$mac-$timestamp';
-
-      // ❌ Skip duplicate
-      if (_dedupCache.contains(uniqueKey)) continue;
+      // ✅ Filtre par intervalle utilisateur (clé MAC lowercase)
+      final lastMs = _lastWriteMs[macKey];
+      if (lastMs != null && (nowMs - lastMs) < minIntervalMs) continue;
 
       for (int j = 0; j < _capteursBox.length; j++) {
         final raw = _capteursBox.getAt(j);
         if (raw == null) continue;
 
-        final capteurMac = raw['MacAddrs']?.toString() ?? '';
-        if (capteurMac != mac) continue;
+        final capteurMac = (raw['MacAddrs']?.toString() ?? '').trim();
+        if (capteurMac.toLowerCase() != macKey) continue;
 
         final typeStr = raw['Type']?.toString() ?? '';
         final sensorType = _sensorTypeMap[typeStr];
@@ -418,16 +599,6 @@ class _HomePageState extends State<HomePage> {
         );
         if (reading == null) continue;
 
-        // ✅ ADD TO CACHE FIRST
-        _dedupCache.add(uniqueKey);
-
-        // 🔥 OPTIONAL: prevent duplicates after app restart
-        final exists = _sensorRead1Box.values.any(
-          (e) => e['MacAddrs'] == mac && e['InfoDate'] == timestamp,
-        );
-
-        if (exists) continue;
-
         await _sensorReadBox.add({
           'uuid_user': _userId,
           'MacAddrs': mac,
@@ -436,7 +607,7 @@ class _HomePageState extends State<HomePage> {
           'luminosite': reading.luminosity?.toStringAsFixed(2) ?? '',
           'presure': reading.pressure?.toStringAsFixed(2) ?? '',
           'lowsignal_strength': result.rssi.toString(),
-          'InfoDate': timestamp.toString(),
+          'InfoDate': nowMs.toString(),
           'gps_lat': _lat,
           'gps_long': _long,
           'gps_time': _time,
@@ -451,14 +622,17 @@ class _HomePageState extends State<HomePage> {
           'temperature': reading.temperature,
           'humidity': reading.humidity,
           'presure': reading.pressure,
-          'InfoDate': timestamp,
+          'InfoDate': nowMs,
         });
-      }
-    }
 
-    // 🔥 Prevent memory leak
-    if (_dedupCache.length > 5000) {
-      _dedupCache.clear();
+        _lastWriteMs[macKey] = nowMs;
+        debugPrint(
+          '💾 _storeSensorReadings: ${raw['Name']} ($mac) '
+          'temp=${reading.temperature.toStringAsFixed(2)}°C '
+          '(intervalle ${intervalMin} min)',
+        );
+        break; // un capteur correspond, pas besoin de continuer la boucle
+      }
     }
   }
   /*Future<void> _storeSensorReadings(List<ScanResult> scans) async {
@@ -473,8 +647,8 @@ class _HomePageState extends State<HomePage> {
         final raw = _capteursBox.getAt(j);
         if (raw == null) continue;
 
-        final capteurMac = raw['MacAddrs']?.toString() ?? '';
-        if (capteurMac != mac) continue;
+        final capteurMac = (raw['MacAddrs']?.toString() ?? '').trim();
+        if (capteurMac.toLowerCase() != mac.toLowerCase()) continue;
 
         final typeStr = raw['Type']?.toString() ?? '';
         final sensorType = _sensorTypeMap[typeStr];
@@ -560,8 +734,11 @@ class _HomePageState extends State<HomePage> {
         }*/
         syncAllSensorReads();
         if (_activityBox.isNotEmpty) {
-          for (int i = 0; i < _activityBox.length; i++) {
-            await _syncActivity(i);
+          // ⚠️ On itère sur un snapshot des clés pour éviter le décalage
+          // d'index quand un item est supprimé en cours de boucle.
+          final keys = _activityBox.keys.toList();
+          for (final key in keys) {
+            await _syncActivityByKey(key);
           }
         }
       } finally {
@@ -649,10 +826,18 @@ class _HomePageState extends State<HomePage> {
     }
   }
 
-  Future<void> _syncActivity(int i) async {
+  /// Tente d'envoyer un item d'activité (start/end de mission) au serveur.
+  ///
+  /// L'item est identifié par sa **clé Hive** (et non par un index), pour
+  /// rester stable même si la box est modifiée pendant la boucle de retry.
+  ///
+  /// Retourne `true` si l'item a été synchronisé (et supprimé de la box),
+  /// `false` sinon — auquel cas il restera dans la box et sera retenté
+  /// au prochain cycle (`interval_sync` défini dans le profil).
+  Future<bool> _syncActivityByKey(dynamic key) async {
     try {
-      final item = _activityBox.getAt(i);
-      if (item == null) return;
+      final item = _activityBox.get(key);
+      if (item == null) return false;
 
       final body = {
         'uuid_user': item['uuid_user']?.toString() ?? '',
@@ -665,7 +850,7 @@ class _HomePageState extends State<HomePage> {
         'gps_direction': item['gps_direction']?.toString() ?? '',
       };
 
-      debugPrint('📤 Sending activity: $body');
+      debugPrint('📤 Sending activity (key=$key): $body');
 
       final response = await http
           .post(Uri.parse(_Api.activity), body: body)
@@ -674,34 +859,38 @@ class _HomePageState extends State<HomePage> {
       debugPrint('📥 activity status: ${response.statusCode}');
       debugPrint('📥 activity body: ${response.body}');
 
-      if (response.statusCode == 200) {
-        dynamic result;
-        try {
-          final rawBody = response.body;
-          final jsonStart = rawBody.indexOf('{');
-          if (jsonStart == -1) {
-            debugPrint('❌ No JSON found in response: $rawBody');
-            return;
-          }
-          result = jsonDecode(rawBody.substring(jsonStart));
-        } catch (_) {
-          debugPrint('❌ activity: invalid JSON — ${response.body}');
-          return;
-        }
+      if (response.statusCode != 200) return false;
 
-        if (result['ACTIVITY_START_END']?['error'] == 'false') {
-          await _activityBox.deleteAt(i);
-          debugPrint('✅ Activity synced and deleted at index $i');
-        } else {
-          debugPrint(
-            '⚠️ activity backend error: ${result['ACTIVITY_START_END']}',
-          );
+      dynamic result;
+      try {
+        final rawBody = response.body;
+        final jsonStart = rawBody.indexOf('{');
+        if (jsonStart == -1) {
+          debugPrint('❌ No JSON found in response: $rawBody');
+          return false;
         }
+        result = jsonDecode(rawBody.substring(jsonStart));
+      } catch (_) {
+        debugPrint('❌ activity: invalid JSON — ${response.body}');
+        return false;
       }
+
+      if (result['ACTIVITY_START_END']?['error'] == 'false') {
+        await _activityBox.delete(key);
+        debugPrint('✅ Activity synced and deleted (key=$key)');
+        return true;
+      }
+
+      debugPrint(
+        '⚠️ activity backend error: ${result['ACTIVITY_START_END']}',
+      );
+      return false;
     } on TimeoutException {
       debugPrint('⏱ activity timeout — will retry later');
+      return false;
     } catch (e) {
       debugPrint('❌ activity error: $e');
+      return false;
     }
   }
 
@@ -715,13 +904,74 @@ class _HomePageState extends State<HomePage> {
     'gps_direction': _dir,
   };
 
+  /// Enregistre un évènement de mission (1 = démarrage, 2 = fin) puis tente
+  /// un envoi **immédiat** au serveur si Internet est disponible.
+  ///
+  /// • Si l'envoi réussit → l'item est supprimé de la box.
+  /// • Si l'envoi échoue (pas de connexion, timeout, erreur backend…) →
+  ///   l'item reste dans `_activityBox` et sera ré-envoyé automatiquement
+  ///   par `_checkConnectivity` au prochain `interval_sync` (paramétrable
+  ///   dans Profil → Synchronisation).
   Future<void> _recordActivity(String type) async {
-    await _activityBox.add({
+    // 1) Toujours sauvegarder localement d'abord (single source of truth).
+    final key = await _activityBox.add({
       'uuid_user': _userId,
       'activity_type': type,
       'activity_date_heur': DateTime.now().toString().substring(0, 19),
       ..._gpsPayload,
     });
+
+    // 2) Tentative d'envoi immédiat (best-effort, ne bloque pas l'UI).
+    bool sent = false;
+    try {
+      final hasInternet = await InternetConnection().hasInternetAccess;
+      if (hasInternet) {
+        sent = await _syncActivityByKey(key);
+      } else {
+        debugPrint('📴 Pas de connexion — activité mise en file d\'attente');
+      }
+    } catch (e) {
+      debugPrint('⚠️ Envoi immédiat impossible: $e — sera retenté');
+    }
+
+    // 3) Feedback utilisateur.
+    if (!mounted) return;
+    final isStart = type == '1';
+    ScaffoldMessenger.of(context)
+      ..hideCurrentSnackBar()
+      ..showSnackBar(
+        SnackBar(
+          duration: const Duration(seconds: 3),
+          backgroundColor:
+              sent ? const Color(0xFF22C55E) : const Color(0xFFF59E0B),
+          behavior: SnackBarBehavior.floating,
+          content: Row(
+            children: [
+              Icon(
+                sent ? Icons.cloud_done_rounded : Icons.cloud_off_rounded,
+                color: Colors.white,
+                size: 18,
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Text(
+                  sent
+                      ? (isStart
+                          ? 'Mission démarrée — envoyée au serveur'
+                          : 'Mission terminée — envoyée au serveur')
+                      : (isStart
+                          ? 'Mission démarrée — sera synchronisée dès la connexion'
+                          : 'Mission terminée — sera synchronisée dès la connexion'),
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      );
   }
 
   void _checkPendingMission() {
@@ -923,7 +1173,39 @@ class _HomePageState extends State<HomePage> {
     final showPrint = _user['user_can_print'] == '1';
     final showReport = _user['user_can_report'] == '1';
 
-    final cards = <Widget>[];
+    // 🔍 DIAGNOSTIC — actif uniquement en mode debug.
+    // Permet de comprendre pourquoi un capteur ne s'affiche pas (mismatch
+    // MAC / Type Hive vs scan BLE). Tree-shaké en release grâce à `kDebugMode`.
+    if (kDebugMode) {
+      debugPrint('───── _buildBody: ${_scanResults.length} BLE scannés, '
+          '${_capteursBox.length} capteurs enregistrés ─────');
+      for (int j = 0; j < _capteursBox.length; j++) {
+        final raw = _capteursBox.getAt(j);
+        if (raw == null) continue;
+        debugPrint(
+          '  📋 Capteur Hive #$j  '
+          'MAC="${raw['MacAddrs']}"  '
+          'Type="${raw['Type']}"  '
+          'Name="${raw['Name']}"',
+        );
+      }
+      for (final result in _scanResults) {
+        debugPrint(
+          '  📡 Scan vu  MAC="${result.device.remoteId.str}"  '
+          'name="${result.advertisementData.advName}"',
+        );
+      }
+    }
+
+    // 1) Construction de la liste des entrées (capteurs détectés ET enregistrés).
+    //
+    // ⚠️ Dédoublonnage par couple (MAC, Type) :
+    //   - `_scanResults` peut contenir le même MAC plusieurs fois après un
+    //     restart BLE (le stream cumule).
+    //   - `_capteursBox` peut avoir des entrées dupliquées côté serveur.
+    // Sans cette protection, la même carte capteur s'affichait 2× ou plus.
+    final entries = <_SensorEntry>[];
+    final seenKeys = <String>{};
     for (final result in _scanResults) {
       final mac = result.device.remoteId.str;
       for (int j = 0; j < _capteursBox.length; j++) {
@@ -931,32 +1213,73 @@ class _HomePageState extends State<HomePage> {
         final raw = _capteursBox.getAt(j);
         if (raw == null) continue;
 
-        final capteurMac = raw['MacAddrs']?.toString() ?? '';
-        if (capteurMac != mac) continue;
+        final capteurMac = (raw['MacAddrs']?.toString() ?? '').trim();
+        if (capteurMac.toLowerCase() != mac.toLowerCase()) continue;
 
         final typeStr = raw['Type']?.toString() ?? '';
         final sensorName = raw['Name']?.toString() ?? '';
         final sensorType = _sensorTypeMap[typeStr];
-        if (sensorType == null) continue;
+        if (sensorType == null) {
+          debugPrint('  ⚠️ MAC $mac matchée mais Type="$typeStr" inconnu — '
+              'ajouter dans _sensorTypeMap');
+          continue;
+        }
 
-        cards.add(
-          Padding(
-            key: ValueKey('card_${mac}_$typeStr'),
-            padding: const EdgeInsets.only(bottom: 10),
-            child: ScanResultCard(
-              key: ValueKey('scan_${mac}_$typeStr'),
-              result: result,
-              name: sensorName,
-              type: typeStr,
-              sensorType: sensorType,
-              showAlert: showAlert,
-              showPrint: showPrint,
-              showReport: showReport,
-            ),
-          ),
-        );
+        // Clé unique d'affichage : on ne garde qu'une carte par (MAC, Type).
+        final dedupKey = '${mac.toLowerCase()}|$typeStr';
+        if (!seenKeys.add(dedupKey)) continue; // déjà ajoutée → on saute
+
+        entries.add(_SensorEntry(
+          result: result,
+          name: sensorName,
+          type: typeStr,
+          sensorType: sensorType,
+        ));
       }
     }
+
+    // 2) Tri en fonction du mode sélectionné.
+    //    - Proximité : RSSI le plus élevé (moins négatif) en premier.
+    //    - Dernière lecture : timestamp BLE le plus récent en premier.
+    switch (_sortMode) {
+      case _SensorSort.nameAsc:
+        entries.sort(
+          (a, b) => a.name.toLowerCase().compareTo(b.name.toLowerCase()),
+        );
+        break;
+      case _SensorSort.nameDesc:
+        entries.sort(
+          (a, b) => b.name.toLowerCase().compareTo(a.name.toLowerCase()),
+        );
+        break;
+      case _SensorSort.proximity:
+        entries.sort((a, b) => b.result.rssi.compareTo(a.result.rssi));
+        break;
+      case _SensorSort.lastSeen:
+        entries.sort(
+          (a, b) => b.result.timeStamp.compareTo(a.result.timeStamp),
+        );
+        break;
+    }
+
+    // 3) Génération des widgets dans l'ordre trié.
+    final cards = entries.map((e) {
+      final mac = e.result.device.remoteId.str;
+      return Padding(
+        key: ValueKey('card_${mac}_${e.type}'),
+        padding: const EdgeInsets.only(bottom: 10),
+        child: ScanResultCard(
+          key: ValueKey('scan_${mac}_${e.type}'),
+          result: e.result,
+          name: e.name,
+          type: e.type,
+          sensorType: e.sensorType,
+          showAlert: showAlert,
+          showPrint: showPrint,
+          showReport: showReport,
+        ),
+      );
+    }).toList();
 
     return Column(
       children: [
@@ -966,53 +1289,76 @@ class _HomePageState extends State<HomePage> {
         Padding(
           padding: const EdgeInsets.fromLTRB(14, 10, 14, 10),
           child: Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
             crossAxisAlignment: CrossAxisAlignment.center,
             children: [
-              Row(
-                children: [
-                  Image.asset(
-                    'assets/images/home/xdd_n.png',
-                    width: 20.0,
-                    height: 20.0,
-                  ),
-                  Gaps.hGap5,
-                  const Text('Mes Capteurs', style: TextStyles.textBold18),
-                ],
-              ),
+              // Pastille circulaire avec le nombre de capteurs (remplace
+              // l'ancien logo + l'ancien badge "X capteurs" à droite).
               Container(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 10,
-                  vertical: 4,
-                ),
+                width: 26,
+                height: 26,
+                alignment: Alignment.center,
                 decoration: BoxDecoration(
+                  shape: BoxShape.circle,
                   color: const Color(0xFFF0F5FF),
-                  borderRadius: BorderRadius.circular(20),
                   border: Border.all(color: const Color(0xFFDDE6FF)),
                 ),
                 child: Text(
-                  '${_capteursBox.length} capteurs',
+                  '${_capteursBox.length}',
                   style: const TextStyle(
-                    fontSize: 11,
-                    fontWeight: FontWeight.w600,
+                    fontSize: 12,
+                    fontWeight: FontWeight.w700,
                     color: Color(0xFF007FFF),
                   ),
                 ),
               ),
+              Gaps.hGap8,
+              const Text('Mes Capteurs', style: TextStyles.textBold18),
+              const Spacer(),
+              // Chip de tri (cliquable → bottom sheet)
+              _SortChip(
+                mode: _sortMode,
+                onTap: _showSortPicker,
+              ),
             ],
           ),
         ),
-        // ─── Sensor cards list
+        // ─── Sensor cards list (avec pull-to-refresh)
         Expanded(
-          child: ListView(
-            key: ValueKey(_scanResults.length),
-            padding: const EdgeInsets.only(top: 2),
-            physics: const BouncingScrollPhysics(),
-            children: cards,
+          child: RefreshIndicator(
+            onRefresh: _onPullToRefresh,
+            color: const Color(0xFF007FFF),
+            child: ListView(
+              key: ValueKey(_scanResults.length),
+              padding: const EdgeInsets.only(top: 2),
+              // ⚠️ AlwaysScrollableScrollPhysics est nécessaire pour que le
+              // RefreshIndicator se déclenche même quand la liste est trop
+              // courte pour scroller.
+              physics: const AlwaysScrollableScrollPhysics(
+                parent: BouncingScrollPhysics(),
+              ),
+              children: cards,
+            ),
           ),
         ),
       ],
     );
+  }
+
+  /// Callback du pull-to-refresh : relance le scan BLE, met à jour la
+  /// position GPS et recharge les alertes. Lance aussi une tentative de
+  /// synchronisation en arrière-plan si Internet est dispo.
+  Future<void> _onPullToRefresh() async {
+    debugPrint('🔄 Pull-to-refresh déclenché');
+    _restartBluetooth();
+    await Future.wait<void>([
+      _updateLocation(),
+      Future(() => _refreshData()),
+    ]);
+    // Délai mini pour que le spinner reste visible un instant et que
+    // l'utilisateur perçoive que l'action a bien eu lieu.
+    await Future.delayed(const Duration(milliseconds: 600));
+    // Tentative de synchronisation (best-effort, ne bloque pas).
+    unawaited(_checkConnectivity());
   }
 
   void _showSettingsMenu() {
@@ -1024,6 +1370,36 @@ class _HomePageState extends State<HomePage> {
       offset: Offset(button.size.width - 8.0, -12.0),
       anchor: button,
       child: const GoodsAddMenu(),
+    );
+  }
+
+  // ─── Tri des capteurs ────────────────────────────────────────────────────────
+
+  /// Sauvegarde le mode de tri choisi dans le `_userBox` (clé `sort_mode`)
+  /// pour que la préférence soit conservée d'une session à l'autre.
+  void _saveSortMode(_SensorSort mode) {
+    setState(() => _sortMode = mode);
+    if (_userBox.isEmpty) return;
+    final key = _userBox.keys.first;
+    final item = _userBox.get(key);
+    if (item == null) return;
+    final updated = Map<dynamic, dynamic>.from(item as Map);
+    updated['sort_mode'] = mode.name;
+    _userBox.put(key, updated);
+  }
+
+  Future<void> _showSortPicker() async {
+    await showModalBottomSheet<void>(
+      context: context,
+      backgroundColor: Colors.transparent,
+      isScrollControlled: true,
+      builder: (ctx) => _SortPickerSheet(
+        current: _sortMode,
+        onSelected: (mode) {
+          _saveSortMode(mode);
+          Navigator.pop(ctx);
+        },
+      ),
     );
   }
 }
@@ -1114,6 +1490,195 @@ class _PillAction extends StatelessWidget {
             ),
           ],
         ),
+      ),
+    );
+  }
+}
+
+// ─── Sort chip + bottom-sheet picker ─────────────────────────────────────────
+
+/// Petite pastille cliquable affichée dans l'en-tête "Mes Capteurs".
+/// Affiche le mode de tri courant et ouvre le sélecteur au tap.
+class _SortChip extends StatelessWidget {
+  const _SortChip({required this.mode, required this.onTap});
+
+  final _SensorSort mode;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    const accent = Color(0xFF007FFF);
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(20),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+        decoration: BoxDecoration(
+          color: accent.withValues(alpha: 0.08),
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(color: accent.withValues(alpha: 0.25)),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(Icons.sort_rounded, size: 13, color: accent),
+            const SizedBox(width: 5),
+            Text(
+              mode.label,
+              style: const TextStyle(
+                fontSize: 11,
+                fontWeight: FontWeight.w600,
+                color: accent,
+              ),
+            ),
+            const SizedBox(width: 2),
+            Icon(Icons.expand_more_rounded, size: 14, color: accent),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+/// Bottom sheet listant les 4 modes de tri disponibles.
+class _SortPickerSheet extends StatelessWidget {
+  const _SortPickerSheet({
+    required this.current,
+    required this.onSelected,
+  });
+
+  final _SensorSort current;
+  final ValueChanged<_SensorSort> onSelected;
+
+  @override
+  Widget build(BuildContext context) {
+    const accent = Color(0xFF007FFF);
+    return Container(
+      decoration: const BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          // Drag handle
+          const SizedBox(height: 10),
+          Container(
+            width: 36,
+            height: 4,
+            decoration: BoxDecoration(
+              color: Colors.grey.shade300,
+              borderRadius: BorderRadius.circular(2),
+            ),
+          ),
+          const SizedBox(height: 14),
+          // Titre
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 20),
+            child: Row(
+              children: [
+                Container(
+                  width: 36,
+                  height: 36,
+                  decoration: BoxDecoration(
+                    color: accent.withValues(alpha: 0.10),
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: const Icon(
+                    Icons.sort_rounded,
+                    size: 18,
+                    color: accent,
+                  ),
+                ),
+                const SizedBox(width: 12),
+                const Text(
+                  'Trier les capteurs',
+                  style: TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.w700,
+                    color: Color(0xFF1A1A2E),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 16),
+          const Divider(height: 1),
+          // Options
+          ..._SensorSort.values.map((s) {
+            final selected = s == current;
+            return InkWell(
+              onTap: () => onSelected(s),
+              child: Container(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 20,
+                  vertical: 14,
+                ),
+                color: selected
+                    ? accent.withValues(alpha: 0.05)
+                    : Colors.transparent,
+                child: Row(
+                  children: [
+                    Container(
+                      width: 40,
+                      height: 40,
+                      decoration: BoxDecoration(
+                        color: selected
+                            ? accent.withValues(alpha: 0.12)
+                            : Colors.grey.withValues(alpha: 0.08),
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      child: Icon(
+                        s.icon,
+                        size: 18,
+                        color: selected ? accent : Colors.grey,
+                      ),
+                    ),
+                    const SizedBox(width: 14),
+                    Expanded(
+                      child: Text(
+                        s.label,
+                        style: TextStyle(
+                          fontSize: 15,
+                          fontWeight:
+                              selected ? FontWeight.w700 : FontWeight.w500,
+                          color: selected ? accent : const Color(0xFF1A1A2E),
+                        ),
+                      ),
+                    ),
+                    if (selected)
+                      Container(
+                        width: 22,
+                        height: 22,
+                        decoration: const BoxDecoration(
+                          color: accent,
+                          shape: BoxShape.circle,
+                        ),
+                        child: const Icon(
+                          Icons.check_rounded,
+                          size: 14,
+                          color: Colors.white,
+                        ),
+                      )
+                    else
+                      Container(
+                        width: 22,
+                        height: 22,
+                        decoration: BoxDecoration(
+                          shape: BoxShape.circle,
+                          border: Border.all(
+                            color: Colors.grey.shade300,
+                            width: 1.5,
+                          ),
+                        ),
+                      ),
+                  ],
+                ),
+              ),
+            );
+          }),
+          SizedBox(height: MediaQuery.of(context).padding.bottom + 16),
+        ],
       ),
     );
   }

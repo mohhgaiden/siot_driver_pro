@@ -136,6 +136,19 @@ class _AlertThreshold {
 enum SensorType { type1, type3, type6, type10 }
 
 extension SensorTypeX on SensorType {
+  /// Recherche tolérante d'une serviceData par UUID court (ex: "2a6e").
+  /// flutter_blue_plus peut renvoyer la clé en forme courte ou complète
+  /// ("0000-2a6e-..."), majuscule/minuscule, selon la version.
+  static List<int>? _findServiceData(AdvertisementData adv, String shortUuid) {
+    final target = shortUuid.toLowerCase();
+    for (final entry in adv.serviceData.entries) {
+      if (entry.key.toString().toLowerCase().contains(target)) {
+        return entry.value;
+      }
+    }
+    return null;
+  }
+
   // ✅ Returns null instead of crashing when data is missing
   SensorReading? tryParse(AdvertisementData adv, {String deviceType = ''}) {
     try {
@@ -146,7 +159,18 @@ extension SensorTypeX on SensorType {
           return SensorReading.type1(Uint8List.fromList(data));
 
         case SensorType.type3:
-          final data = adv.serviceData[Guid('2a6e')];
+          // 🔍 DIAGNOSTIC TEMPORAIRE — à retirer ensuite
+          if (adv.serviceData.isEmpty) {
+            debugPrint('⚠️ type3: serviceData VIDE — '
+                'name="${adv.advName}" '
+                'mfgKeys=${adv.manufacturerData.keys.toList()}');
+          } else {
+            debugPrint('🔍 type3: serviceData keys=${adv.serviceData.keys
+                    .map((k) => k.toString())
+                    .toList()} '
+                'name="${adv.advName}"');
+          }
+          final data = _findServiceData(adv, '2a6e');
           if (data == null || data.isEmpty) return null;
           return SensorReading.type3(Uint8List.fromList(data));
 
@@ -657,11 +681,25 @@ class _ScanResultCardState extends State<ScanResultCard> {
           isAlert: signalAlert,
         ),
         const SizedBox(width: 6),
-        // ─ Date (gauche)
+        // ─ Date + Heure (gauche) — affichage agrandi
         _FooterChip(
           icon: Icons.access_time_rounded,
-          label: widget.result.timeStamp.toString().substring(11, 19),
+          // Format : JJ/MM HH:MM:SS  (ex. "08/05 14:32:07")
+          label: () {
+            final ts = widget.result.timeStamp.toString(); // 2026-05-08 14:32:07.xxx
+            final date = ts.substring(0, 10); // 2026-05-08
+            final time = ts.substring(11, 19); // 14:32:07
+            final dmy = '${date.substring(8, 10)}/${date.substring(5, 7)}';
+            return '$dmy  $time';
+          }(),
+          large: true,
         ),
+        const SizedBox(width: 4),
+        // ─ Sablier de fraîcheur — indique visuellement si l'info est récente.
+        //   • vert  : < 30 s     (sablier plein en haut)
+        //   • orange: 30 s – 2 min (sablier en cours)
+        //   • rouge : > 2 min     (sablier épuisé)
+        _FreshnessIndicator(timestamp: widget.result.timeStamp),
         const Spacer(),
         // ─ Voltage (droite)
         if (reading.voltage != null)
@@ -783,17 +821,28 @@ class _FooterChip extends StatelessWidget {
     required this.icon,
     required this.label,
     this.isAlert = false,
+    this.large = false,
   });
 
   final IconData icon;
   final String label;
   final bool isAlert;
 
+  /// Si `true`, le chip est légèrement agrandi (utilisé pour l'horodatage
+  /// dans le footer afin que la date + heure restent lisibles).
+  final bool large;
+
   @override
   Widget build(BuildContext context) {
     final color = isAlert ? Colors.red : Colours.text_gray;
+
+    final iconSize = large ? 13.0 : 11.0;
+    final fontSize = large ? 12.5 : 11.0;
+    final hPad = large ? 9.0 : 7.0;
+    final vPad = large ? 5.0 : 3.0;
+
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
+      padding: EdgeInsets.symmetric(horizontal: hPad, vertical: vPad),
       decoration: BoxDecoration(
         color: isAlert ? Colors.red.withValues(alpha: 0.08) : Colours.bg_gray,
         borderRadius: BorderRadius.circular(5),
@@ -804,19 +853,80 @@ class _FooterChip extends StatelessWidget {
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(icon, size: 11, color: color),
-          const SizedBox(width: 4),
+          Icon(icon, size: iconSize, color: color),
+          SizedBox(width: large ? 5 : 4),
           Text(
             label,
             style: TextStyle(
-              fontSize: 11,
+              fontSize: fontSize,
               color: color,
-              fontWeight: isAlert ? FontWeight.w700 : FontWeight.normal,
+              fontWeight: isAlert
+                  ? FontWeight.w700
+                  : (large ? FontWeight.w600 : FontWeight.normal),
             ),
           ),
         ],
       ),
     );
+  }
+}
+
+/// Indicateur visuel de fraîcheur d'une lecture capteur.
+///
+/// Affiche un petit sablier dont la couleur et l'orientation reflètent l'âge
+/// de la mesure :
+/// • **Vert + sablier plein en haut** → < 30 s (donnée fraîche)
+/// • **Orange + sablier en cours**     → 30 s – 2 min
+/// • **Rouge + sablier épuisé**         → > 2 min (donnée potentiellement obsolète)
+///
+/// Le widget est volontairement *stateless* : la carte parente
+/// (`_ScanResultCardState`) déclenche déjà un `setState` toutes les secondes
+/// via son propre `_timer`, donc l'âge se met à jour automatiquement.
+class _FreshnessIndicator extends StatelessWidget {
+  const _FreshnessIndicator({required this.timestamp});
+
+  final DateTime timestamp;
+
+  static const _freshThreshold = Duration(seconds: 30);
+  static const _staleThreshold = Duration(minutes: 2);
+
+  @override
+  Widget build(BuildContext context) {
+    final age = DateTime.now().difference(timestamp);
+
+    final IconData icon;
+    final Color color;
+    if (age < _freshThreshold) {
+      icon = Icons.hourglass_top_rounded;
+      color = const Color(0xFF22C55E); // vert
+    } else if (age < _staleThreshold) {
+      icon = Icons.hourglass_bottom_rounded;
+      color = const Color(0xFFF59E0B); // orange
+    } else {
+      icon = Icons.hourglass_disabled_rounded;
+      color = const Color(0xFFEF4444); // rouge
+    }
+
+    return Tooltip(
+      message: 'Reçu il y a ${_humanAge(age)}',
+      child: Container(
+        width: 24,
+        height: 24,
+        alignment: Alignment.center,
+        decoration: BoxDecoration(
+          color: color.withValues(alpha: 0.10),
+          shape: BoxShape.circle,
+          border: Border.all(color: color.withValues(alpha: 0.30)),
+        ),
+        child: Icon(icon, size: 14, color: color),
+      ),
+    );
+  }
+
+  static String _humanAge(Duration d) {
+    if (d.inSeconds < 60) return '${d.inSeconds} s';
+    if (d.inMinutes < 60) return '${d.inMinutes} min';
+    return '${d.inHours} h';
   }
 }
 

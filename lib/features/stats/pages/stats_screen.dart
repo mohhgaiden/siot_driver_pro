@@ -1,8 +1,12 @@
 import 'dart:async';
+import 'dart:io';
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:hive_flutter/hive_flutter.dart';
+import 'package:intl/intl.dart';
+import 'package:open_file/open_file.dart';
+import 'package:path_provider/path_provider.dart';
 import 'package:table_calendar/table_calendar.dart';
 import '../../../charts/beziar_chart/bezier_chart_plus.dart';
 import '../../../core/constants/colors.dart';
@@ -26,6 +30,7 @@ class StatsPage extends StatefulWidget {
 class _StatsPageState extends State<StatsPage> {
   //List<Map<String, dynamic>> items = [];
   final _statsBox = Hive.box('SENSOR_READ1');
+  final _alertBox = Hive.box('Alert');
 
   late DateTime _selectedDay = DateTime(
     DateTime.now().year,
@@ -38,6 +43,51 @@ class _StatsPageState extends State<StatsPage> {
 
   final userBox = Hive.box('LOGGED_IN_USER');
 
+  /// Seuils d'alerte du capteur courant (lus depuis la box `Alert`).
+  /// Clé : "temperature" / "humidity" / "presure"
+  Map<String, _AlertRange> _thresholds = {};
+
+  /// Format du calendrier (semaine compact par défaut, basculable en mois)
+  CalendarFormat _calendarFormat = CalendarFormat.week;
+
+  void _loadThresholds() {
+    final mac = widget.macAddrs.trim().toLowerCase();
+    Map? raw;
+    for (final key in _alertBox.keys) {
+      final item = _alertBox.get(key);
+      if (item == null) continue;
+      final m = (item['MacAddrs']?.toString() ?? '').trim().toLowerCase();
+      if (m == mac) {
+        raw = item as Map;
+        break;
+      }
+    }
+    if (raw == null) {
+      _thresholds = {};
+      return;
+    }
+    _thresholds = {
+      'temperature': _AlertRange.from(
+        raw,
+        'checkedtemperature',
+        'lowtemperature',
+        'hightemperature',
+      ),
+      'humidity': _AlertRange.from(
+        raw,
+        'checkedhumidity',
+        'lowhumidity',
+        'highhumidity',
+      ),
+      'presure': _AlertRange.from(
+        raw,
+        'checkedpresure',
+        'lowpresure',
+        'highpresure',
+      ),
+    };
+  }
+
   @override
   void initState() {
     super.initState();
@@ -46,6 +96,7 @@ class _StatsPageState extends State<StatsPage> {
     } else {
       _refreshInterval = 7;
     }
+    _loadThresholds();
   }
 
   List<Map<String, dynamic>> _filterData() {
@@ -121,19 +172,115 @@ class _StatsPageState extends State<StatsPage> {
     }
   }
 
+  // ─── Export CSV ─────────────────────────────────────────────────────────────
+
+  Future<void> _exportCsv(List<Map<String, dynamic>> items) async {
+    if (items.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: const Text('Aucune donnée à exporter pour ce jour.'),
+          backgroundColor: Colors.grey.shade700,
+          behavior: SnackBarBehavior.floating,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(10),
+          ),
+          margin: const EdgeInsets.all(16),
+        ),
+      );
+      return;
+    }
+    try {
+      // Header + lignes (séparateur ; pour ouverture directe dans Excel FR)
+      final sb = StringBuffer();
+      sb.writeln('Date;Heure;Température (°C);Humidité (%);Pression (hPa)');
+      final df = DateFormat('dd/MM/yyyy;HH:mm:ss');
+      for (final r in items) {
+        final ts = (r['InfoDate'] as num).toInt();
+        final dt = DateTime.fromMillisecondsSinceEpoch(ts);
+        final temp = r['temperature']?.toStringAsFixed(2) ?? '';
+        final hum = r['humidity']?.toStringAsFixed(2) ?? '';
+        final press = r['presure']?.toStringAsFixed(2) ?? '';
+        sb.writeln(
+          '${df.format(dt)};'
+          '${temp.replaceAll('.', ',')};'
+          '${hum.replaceAll('.', ',')};'
+          '${press.replaceAll('.', ',')}',
+        );
+      }
+
+      final dir = await getApplicationDocumentsDirectory();
+      final dayLabel = DateFormat('yyyy-MM-dd').format(_selectedDay);
+      final cleanName = widget.name.replaceAll(RegExp(r'[^A-Za-z0-9_-]'), '_');
+      final file = File('${dir.path}/${cleanName}_$dayLabel.csv');
+      // BOM UTF-8 pour qu'Excel reconnaisse les accents
+      await file.writeAsString('﻿${sb.toString()}');
+      await OpenFile.open(file.path);
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Erreur lors de l\'export CSV : $e'),
+            backgroundColor: Colors.red,
+            behavior: SnackBarBehavior.floating,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(10),
+            ),
+            margin: const EdgeInsets.all(16),
+          ),
+        );
+      }
+    }
+  }
+
   // ─── Compute min / max / avg ────────────────────────────────────────────────
 
   _DayStat _stat(String field, List items) {
-    final values =
+    final filtered =
         items
             .where((e) => e[field] != null)
-            .map((e) => (e[field] as num).toDouble())
+            .map(
+              (e) => {
+                'value': (e[field] as num).toDouble(),
+                'ts': (e['InfoDate'] as num).toInt(),
+              },
+            )
             .toList();
-    if (values.isEmpty) return const _DayStat.empty();
-    final min = values.reduce((a, b) => a < b ? a : b);
-    final max = values.reduce((a, b) => a > b ? a : b);
-    final avg = values.fold(0.0, (a, b) => a + b) / values.length;
-    return _DayStat(min: min, max: max, avg: avg);
+    if (filtered.isEmpty) return const _DayStat.empty();
+
+    double minV = filtered.first['value'] as double;
+    double maxV = minV;
+    int minTs = filtered.first['ts'] as int;
+    int maxTs = minTs;
+    double sum = 0;
+    for (final e in filtered) {
+      final v = e['value'] as double;
+      final t = e['ts'] as int;
+      if (v < minV) {
+        minV = v;
+        minTs = t;
+      }
+      if (v > maxV) {
+        maxV = v;
+        maxTs = t;
+      }
+      sum += v;
+    }
+    return _DayStat(
+      min: minV,
+      max: maxV,
+      avg: sum / filtered.length,
+      minAt: DateTime.fromMillisecondsSinceEpoch(minTs),
+      maxAt: DateTime.fromMillisecondsSinceEpoch(maxTs),
+    );
+  }
+
+  // ─── Quick day shortcut ─────────────────────────────────────────────────────
+
+  void _selectQuickDay(int daysAgo) {
+    final now = DateTime.now();
+    setState(() {
+      _selectedDay = DateTime(now.year, now.month, now.day - daysAgo);
+    });
   }
 
   // ─── Build ──────────────────────────────────────────────────────────────────
@@ -154,6 +301,7 @@ class _StatsPageState extends State<StatsPage> {
             physics: const BouncingScrollPhysics(),
             slivers: [
               _buildAppBar(context, items),
+              SliverToBoxAdapter(child: _buildQuickDayBar()),
               SliverToBoxAdapter(child: _buildCalendar()),
               SliverToBoxAdapter(child: _buildDayBadges(items)),
 
@@ -166,6 +314,7 @@ class _StatsPageState extends State<StatsPage> {
                   field: 'temperature',
                   color: Colours.app_main,
                   icon: Icons.thermostat_rounded,
+                  threshold: _thresholds['temperature'],
                 ),
               ),
 
@@ -179,6 +328,7 @@ class _StatsPageState extends State<StatsPage> {
                     field: 'humidity',
                     color: const Color(0xFFFF8C00),
                     icon: Icons.water_drop_rounded,
+                    threshold: _thresholds['humidity'],
                   ),
                 ),
 
@@ -192,6 +342,7 @@ class _StatsPageState extends State<StatsPage> {
                     field: 'presure',
                     color: const Color(0xFFEF4444),
                     icon: Icons.compress_rounded,
+                    threshold: _thresholds['presure'],
                   ),
                 ),
 
@@ -221,6 +372,23 @@ class _StatsPageState extends State<StatsPage> {
         style: TextStyle(fontWeight: FontWeight.w600, fontSize: 17),
       ),
       actions: [
+        // ── Bouton CSV
+        IconButton(
+          icon: Container(
+            padding: const EdgeInsets.all(6),
+            decoration: BoxDecoration(
+              color: Colors.white.withValues(alpha: 0.20),
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: const Icon(
+              Icons.table_chart_rounded,
+              size: 18,
+              color: Colors.white,
+            ),
+          ),
+          tooltip: 'Exporter CSV',
+          onPressed: () => _exportCsv(items.cast<Map<String, dynamic>>()),
+        ),
         Padding(
           padding: const EdgeInsets.only(right: 4),
           child:
@@ -334,11 +502,50 @@ class _StatsPageState extends State<StatsPage> {
     );
   }
 
+  // ─── Barre raccourcis Aujourd'hui / Hier / Avant-hier ───────────────────────
+
+  Widget _buildQuickDayBar() {
+    final today = DateTime.now();
+    final selected = _selectedDay;
+    final daysAgo = today.difference(selected).inDays;
+
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 10, 16, 0),
+      child: Row(
+        children: [
+          _QuickChip(
+            label: "Aujourd'hui",
+            selected: daysAgo == 0,
+            onTap: () => _selectQuickDay(0),
+          ),
+          const SizedBox(width: 6),
+          _QuickChip(
+            label: 'Hier',
+            selected: daysAgo == 1,
+            onTap: () => _selectQuickDay(1),
+          ),
+          const SizedBox(width: 6),
+          _QuickChip(
+            label: '−2 j',
+            selected: daysAgo == 2,
+            onTap: () => _selectQuickDay(2),
+          ),
+          const SizedBox(width: 6),
+          _QuickChip(
+            label: '−3 j',
+            selected: daysAgo == 3,
+            onTap: () => _selectQuickDay(3),
+          ),
+        ],
+      ),
+    );
+  }
+
   // ─── Calendrier ─────────────────────────────────────────────────────────────
 
   Widget _buildCalendar() {
     return Container(
-      margin: const EdgeInsets.fromLTRB(16, 16, 16, 0),
+      margin: const EdgeInsets.fromLTRB(16, 10, 16, 0),
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(14),
@@ -353,28 +560,50 @@ class _StatsPageState extends State<StatsPage> {
       child: ClipRRect(
         borderRadius: BorderRadius.circular(14),
         child: TableCalendar(
-          locale: 'en_US',
-          rowHeight: 36,
-          daysOfWeekHeight: 32,
+          locale: 'fr_FR',
+          rowHeight: 32,
+          daysOfWeekHeight: 22,
+          calendarFormat: _calendarFormat,
+          onFormatChanged: (f) => setState(() => _calendarFormat = f),
+          availableCalendarFormats: const {
+            CalendarFormat.week: 'Semaine',
+            CalendarFormat.month: 'Mois',
+          },
           headerStyle: HeaderStyle(
-            formatButtonVisible: false,
             titleCentered: true,
             titleTextStyle: const TextStyle(
               fontWeight: FontWeight.w700,
-              fontSize: 14,
+              fontSize: 13,
               color: Color(0xFF1A1A2E),
             ),
             leftChevronIcon: Icon(
               Icons.chevron_left_rounded,
               color: Colours.app_main,
-              size: 22,
+              size: 20,
             ),
             rightChevronIcon: Icon(
               Icons.chevron_right_rounded,
               color: Colours.app_main,
-              size: 22,
+              size: 20,
             ),
-            headerPadding: const EdgeInsets.symmetric(vertical: 10),
+            headerPadding: const EdgeInsets.symmetric(vertical: 6),
+            formatButtonShowsNext: false,
+            formatButtonDecoration: BoxDecoration(
+              color: Colours.app_main.withValues(alpha: 0.10),
+              borderRadius: BorderRadius.circular(20),
+              border: Border.all(
+                color: Colours.app_main.withValues(alpha: 0.30),
+              ),
+            ),
+            formatButtonTextStyle: TextStyle(
+              fontSize: 11,
+              fontWeight: FontWeight.w600,
+              color: Colours.app_main,
+            ),
+            formatButtonPadding: const EdgeInsets.symmetric(
+              horizontal: 10,
+              vertical: 4,
+            ),
           ),
           daysOfWeekStyle: DaysOfWeekStyle(
             weekdayStyle: const TextStyle(
@@ -443,7 +672,7 @@ class _StatsPageState extends State<StatsPage> {
     final label =
         '${d.day.toString().padLeft(2, '0')}/${d.month.toString().padLeft(2, '0')}/${d.year}';
     return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 14, 16, 8),
+      padding: const EdgeInsets.fromLTRB(16, 10, 16, 6),
       child: Row(
         children: [
           _InfoBadge(
@@ -472,8 +701,14 @@ class _StatsPageState extends State<StatsPage> {
     required Color color,
     required IconData icon,
     required List<Map<String, dynamic>> items,
+    _AlertRange? threshold,
   }) {
     final stat = _stat(field, items);
+    final hasThreshold = threshold?.checked == true;
+    final minOutOfRange =
+        hasThreshold && stat.hasData && stat.min < threshold!.low;
+    final maxOutOfRange =
+        hasThreshold && stat.hasData && stat.max > threshold!.high;
 
     // rawItems  → real data (used for badge count, empty check, scroll width)
     // chartItems → padded to ≥6 so BezierChart never crashes
@@ -558,6 +793,49 @@ class _StatsPageState extends State<StatsPage> {
               ),
             ),
 
+            // ── Bandeau seuils d'alerte ──────────────────────────────────
+            if (hasThreshold)
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 14,
+                  vertical: 8,
+                ),
+                color: (minOutOfRange || maxOutOfRange)
+                    ? const Color(0xFFFEE2E2)
+                    : const Color(0xFFF0FDF4),
+                child: Row(
+                  children: [
+                    Icon(
+                      (minOutOfRange || maxOutOfRange)
+                          ? Icons.warning_amber_rounded
+                          : Icons.check_circle_rounded,
+                      size: 14,
+                      color: (minOutOfRange || maxOutOfRange)
+                          ? const Color(0xFFDC2626)
+                          : const Color(0xFF16A34A),
+                    ),
+                    const SizedBox(width: 6),
+                    Expanded(
+                      child: Text(
+                        (minOutOfRange || maxOutOfRange)
+                            ? 'Hors plage : seuils ${threshold!.low.toStringAsFixed(1)} – '
+                                  '${threshold.high.toStringAsFixed(1)} $unit'
+                            : 'Plage normale : ${threshold!.low.toStringAsFixed(1)} – '
+                                  '${threshold.high.toStringAsFixed(1)} $unit',
+                        style: TextStyle(
+                          fontSize: 11,
+                          fontWeight: FontWeight.w600,
+                          color: (minOutOfRange || maxOutOfRange)
+                              ? const Color(0xFFDC2626)
+                              : const Color(0xFF166534),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+
             // ── Zone chart ────────────────────────────────────────────────
             SizedBox(
               height: 260,
@@ -615,14 +893,23 @@ class _StatsPageState extends State<StatsPage> {
                                   0,
                                   chartItems.length - 1,
                                 );
+                                final item = chartItems[idx];
                                 final dt = DateTime.fromMillisecondsSinceEpoch(
-                                  chartItems[idx]['InfoDate'] as int,
+                                  item['InfoDate'] as int,
                                 );
-                                return '${dt.day.toString().padLeft(2, '0')}/'
-                                    '${dt.month.toString().padLeft(2, '0')} '
-                                    '${dt.hour.toString().padLeft(2, '0')}:'
-                                    '${dt.minute.toString().padLeft(2, '0')}:'
-                                    '${dt.second.toString().padLeft(2, '0')} \n';
+                                final v = (item[field] as num?)?.toDouble();
+                                final avg = stat.hasData ? stat.avg : null;
+                                final delta =
+                                    (v != null && avg != null)
+                                        ? (v - avg)
+                                        : null;
+                                final dateLine =
+                                    '${DateFormat('EEE dd MMM • HH:mm:ss', 'fr_FR').format(dt)}';
+                                final deltaLine =
+                                    delta != null
+                                        ? '${delta >= 0 ? '+' : ''}${delta.toStringAsFixed(2)} $unit / moy.'
+                                        : '';
+                                return '$dateLine\n$deltaLine\n';
                               },
                               series: [
                                 BezierLine(
@@ -655,16 +942,23 @@ class _StatsPageState extends State<StatsPage> {
                                 snap: true,
                                 showDataPoints: true,
                                 footerHeight: 28,
-                                displayYAxis: false,
+                                // ✅ Axe Y gradué (paliers auto selon plage)
+                                displayYAxis: true,
                                 startYAxisFromNonZeroValue: true,
+                                // ✅ Lignes verticales légères pour les graduations X
+                                displayLinesXAxis: true,
+                                xLinesColor: Colors.grey.shade200,
                                 yAxisTextStyle: TextStyle(
-                                  fontSize: 9,
-                                  color: Colors.grey.shade500,
+                                  fontSize: 10,
+                                  color: Colors.grey.shade600,
+                                  fontWeight: FontWeight.w600,
                                 ),
                                 xAxisTextStyle: TextStyle(
-                                  fontSize: 9,
-                                  color: Colors.grey.shade500,
+                                  fontSize: 10,
+                                  color: Colors.grey.shade600,
+                                  fontWeight: FontWeight.w600,
                                 ),
+                                backgroundColor: Colors.white,
                                 bubbleIndicatorColor: color,
                                 bubbleIndicatorValueStyle: const TextStyle(
                                   color: Colors.white,
@@ -705,8 +999,13 @@ class _StatsPageState extends State<StatsPage> {
                         label: 'Min',
                         value: stat.min.toStringAsFixed(1),
                         unit: unit,
-                        color: const Color(0xFF22C55E),
-                        icon: Icons.arrow_downward_rounded,
+                        timeAt: stat.minAt,
+                        color: minOutOfRange
+                            ? const Color(0xFFDC2626)
+                            : const Color(0xFF22C55E),
+                        icon: minOutOfRange
+                            ? Icons.warning_amber_rounded
+                            : Icons.arrow_downward_rounded,
                       ),
                     ),
                     const SizedBox(width: 8),
@@ -725,8 +1024,13 @@ class _StatsPageState extends State<StatsPage> {
                         label: 'Max',
                         value: stat.max.toStringAsFixed(1),
                         unit: unit,
-                        color: const Color(0xFFEF4444),
-                        icon: Icons.arrow_upward_rounded,
+                        timeAt: stat.maxAt,
+                        color: maxOutOfRange
+                            ? const Color(0xFFDC2626)
+                            : const Color(0xFFEF4444),
+                        icon: maxOutOfRange
+                            ? Icons.warning_amber_rounded
+                            : Icons.arrow_upward_rounded,
                       ),
                     ),
                   ],
@@ -743,12 +1047,51 @@ class _StatsPageState extends State<StatsPage> {
 // ─── Models ───────────────────────────────────────────────────────────────────
 
 class _DayStat {
-  const _DayStat({required this.min, required this.max, required this.avg})
-    : hasData = true;
-  const _DayStat.empty() : min = 0, max = 0, avg = 0, hasData = false;
+  const _DayStat({
+    required this.min,
+    required this.max,
+    required this.avg,
+    required this.minAt,
+    required this.maxAt,
+  }) : hasData = true;
+  const _DayStat.empty()
+    : min = 0,
+      max = 0,
+      avg = 0,
+      minAt = null,
+      maxAt = null,
+      hasData = false;
 
   final double min, max, avg;
+  final DateTime? minAt, maxAt;
   final bool hasData;
+}
+
+class _AlertRange {
+  const _AlertRange({
+    required this.checked,
+    required this.low,
+    required this.high,
+  });
+
+  /// Construit depuis un Map Hive avec les clés du backend
+  /// (`checkedtemperature`, `lowtemperature`, `hightemperature`, etc.)
+  factory _AlertRange.from(
+    Map raw,
+    String checkedKey,
+    String lowKey,
+    String highKey,
+  ) {
+    return _AlertRange(
+      checked: raw[checkedKey]?.toString() == '1',
+      low: (raw[lowKey] as num?)?.toDouble() ?? 0,
+      high: (raw[highKey] as num?)?.toDouble() ?? 0,
+    );
+  }
+
+  final bool checked;
+  final double low;
+  final double high;
 }
 
 // ─── Reusable widgets ─────────────────────────────────────────────────────────
@@ -799,11 +1142,13 @@ class _StatChip extends StatelessWidget {
     required this.unit,
     required this.color,
     required this.icon,
+    this.timeAt,
   });
 
   final String label, value, unit;
   final Color color;
   final IconData icon;
+  final DateTime? timeAt;
 
   @override
   Widget build(BuildContext context) {
@@ -857,7 +1202,74 @@ class _StatChip extends StatelessWidget {
             ),
             textAlign: TextAlign.center,
           ),
+          if (timeAt != null) ...[
+            const SizedBox(height: 2),
+            Text(
+              'à ${DateFormat('HH:mm').format(timeAt!)}',
+              style: TextStyle(
+                fontSize: 9,
+                color: color.withValues(alpha: 0.70),
+                fontWeight: FontWeight.w500,
+              ),
+            ),
+          ],
         ],
+      ),
+    );
+  }
+}
+
+// ─── Bouton raccourci de jour ────────────────────────────────────────────────
+
+class _QuickChip extends StatelessWidget {
+  const _QuickChip({
+    required this.label,
+    required this.selected,
+    required this.onTap,
+  });
+
+  final String label;
+  final bool selected;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return Expanded(
+      child: GestureDetector(
+        onTap: onTap,
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 180),
+          padding: const EdgeInsets.symmetric(vertical: 8),
+          decoration: BoxDecoration(
+            color: selected ? Colours.app_main : Colors.white,
+            borderRadius: BorderRadius.circular(20),
+            border: Border.all(
+              color:
+                  selected
+                      ? Colours.app_main
+                      : Colours.app_main.withValues(alpha: 0.30),
+            ),
+            boxShadow:
+                selected
+                    ? [
+                      BoxShadow(
+                        color: Colours.app_main.withValues(alpha: 0.30),
+                        blurRadius: 6,
+                        offset: const Offset(0, 2),
+                      ),
+                    ]
+                    : null,
+          ),
+          alignment: Alignment.center,
+          child: Text(
+            label,
+            style: TextStyle(
+              fontSize: 12,
+              fontWeight: FontWeight.w600,
+              color: selected ? Colors.white : Colours.app_main,
+            ),
+          ),
+        ),
       ),
     );
   }

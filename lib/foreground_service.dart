@@ -1,52 +1,41 @@
 import 'dart:async';
 import 'dart:isolate';
-import 'dart:io';
+
 import 'package:flutter_foreground_task/flutter_foreground_task.dart';
 import 'package:flutter_blue_plus/flutter_blue_plus.dart';
-import 'ble_background_service.dart';import 'package:flutter/foundation.dart';
+import 'package:hive_flutter/hive_flutter.dart';
+
+import 'ble_background_service.dart';
 
 class BleTaskHandler extends TaskHandler {
   StreamSubscription<List<ScanResult>>? _scanSub;
 
   @override
-  Future<void> onStart(
-    DateTime timestamp,
-    SendPort? sendPort,
-  ) async {
-    // Hard guard — this handler must never run on iOS
-    if (!Platform.isAndroid) return;
+  void onStart(DateTime timestamp, SendPort? sendPort) async {
+    await _initHive();
 
-    try {
-      await FlutterBluePlus.startScan();
-      _scanSub = FlutterBluePlus.scanResults.listen(
-        (results) async {
-          try {
-            await BleBackgroundService.storeSensorReadings(results);
-          } catch (e) {
-            debugPrint('BLE STORE ERROR: $e');
-          }
-        },
-      );
-    } catch (e) {
-      debugPrint('BLE SCAN ERROR: $e');
-    }
+    FlutterBluePlus.startScan();
+
+    _scanSub = FlutterBluePlus.scanResults.listen((results) async {
+      // 🚀 THIS IS YOUR BACKGROUND LOGIC
+      await BleBackgroundService.storeSensorReadings(results);
+    });
   }
 
   @override
-  Future<void> onDestroy(
-    DateTime timestamp,
-    SendPort? sendPort,
-  ) async {
-    if (!Platform.isAndroid) return;
-    await _scanSub?.cancel();
-    try {
-      await FlutterBluePlus.stopScan();
-    } catch (_) {}
+  void onDestroy(DateTime timestamp, SendPort? sendPort) {
+    _scanSub?.cancel();
   }
 
   @override
-  void onRepeatEvent(
-    DateTime timestamp,
-    SendPort? sendPort,
-  ) {}
+  void onRepeatEvent(DateTime timestamp, SendPort? sendPort) {}
+
+  Future<void> _initHive() async {
+    await Hive.initFlutter();
+
+    await Hive.openBox('LOGGED_IN_USER');
+    await Hive.openBox('LIST_CAPTEURS');
+    await Hive.openBox('SENSOR_READ');
+    await Hive.openBox('SENSOR_READ1');
+  }
 }

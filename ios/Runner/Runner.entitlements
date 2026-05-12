@@ -2,16 +2,5 @@
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
-  <!-- Required for background BLE scanning -->
-  <key>com.apple.developer.bluetooth.le.accessory</key>
-  <true/>
-
-  <!-- Required if you use NSLocationAlwaysAndWhenInUse -->
-  <key>com.apple.developer.location.always-use-authorization</key>
-  <true/>
-
-  <!-- Required for push notifications (even local ones in release) -->
-  <key>aps-environment</key>
-  <string>production</string>
 </dict>
 </plist>

@@ -7,17 +7,32 @@ import '../../../common/load_image.dart';
 // ─── Intervalles disponibles ──────────────────────────────────────────────────
 
 class _Interval {
-  const _Interval(this.label, this.minutes);
+  const _Interval(this.label, this.duration);
   final String label;
-  final int minutes;
+  final Duration duration;
 }
 
-const _kIntervals = [
-  _Interval('1 minute', 1),
-  _Interval('5 minutes', 5),
-  _Interval('10 minutes', 10),
-  _Interval('30 minutes', 30),
-  _Interval('1 heure', 60),
+/// Intervalles proposés pour le rafraîchissement de l'affichage (sub-minute
+/// autorisé : 30 s, 2 min, 3 min en plus des paliers historiques).
+const _kIntervalsAffichage = <_Interval>[
+  _Interval('30 secondes', Duration(seconds: 30)),
+  _Interval('1 minute', Duration(minutes: 1)),
+  _Interval('2 minutes', Duration(minutes: 2)),
+  _Interval('3 minutes', Duration(minutes: 3)),
+  _Interval('5 minutes', Duration(minutes: 5)),
+  _Interval('10 minutes', Duration(minutes: 10)),
+  _Interval('30 minutes', Duration(minutes: 30)),
+  _Interval('1 heure', Duration(hours: 1)),
+];
+
+/// Intervalles proposés pour le stockage et la synchronisation (granularité
+/// en minutes — pas besoin de sub-minute pour ces opérations réseau / disque).
+const _kIntervalsMinutes = <_Interval>[
+  _Interval('1 minute', Duration(minutes: 1)),
+  _Interval('5 minutes', Duration(minutes: 5)),
+  _Interval('10 minutes', Duration(minutes: 10)),
+  _Interval('30 minutes', Duration(minutes: 30)),
+  _Interval('1 heure', Duration(hours: 1)),
 ];
 
 // ─── Page ─────────────────────────────────────────────────────────────────────
@@ -35,10 +50,26 @@ class _ProfilePageState extends State<ProfilePage> {
   final _userBox = Hive.box('LOGGED_IN_USER');
   final _capteursBox = Hive.box('LIST_CAPTEURS');
 
-  // Intervalles (en minutes)
-  int _intervalAffichage = 5;
-  int _intervalStockage = 10;
-  int _intervalSync = 30;
+  // Intervalle affichage stocké en SECONDES (permet 30 s, 2 min, 3 min…).
+  // Stockage et synchronisation restent en MINUTES (granularité minute).
+  // ⚠️ Défaut : 1 minute pour l'affichage.
+  Duration _intervalAffichage = const Duration(minutes: 1);
+  Duration _intervalStockage = const Duration(minutes: 10);
+  Duration _intervalSync = const Duration(minutes: 30);
+
+  /// Convertit la valeur brute lue dans Hive pour `interval_affichage`.
+  ///
+  /// Avant cette version, la valeur était stockée en **minutes** (ex. "5").
+  /// Désormais elle est stockée en **secondes** (ex. "60", "300").
+  /// Pour rester compatible avec les anciennes installations, toute valeur
+  /// `< 30` est considérée comme du legacy (minutes → multiplication par 60).
+  /// Défaut : 60 s (= 1 minute).
+  static Duration _decodeAffichage(String? raw) {
+    final n = int.tryParse(raw ?? '') ?? 60;
+    return n < 30
+        ? Duration(minutes: n) // legacy : valeur en minutes
+        : Duration(seconds: n); // nouveau : valeur en secondes
+  }
 
   @override
   void initState() {
@@ -70,11 +101,13 @@ class _ProfilePageState extends State<ProfilePage> {
     final users = data.reversed.toList();
     if (users.isNotEmpty) {
       final u = users.first;
-      _intervalAffichage =
-          int.tryParse(u['interval_affichage']?.toString() ?? '') ?? 5;
-      _intervalStockage =
-          int.tryParse(u['interval_stockage']?.toString() ?? '') ?? 10;
-      _intervalSync = int.tryParse(u['interval_sync']?.toString() ?? '') ?? 30;
+      _intervalAffichage = _decodeAffichage(u['interval_affichage']?.toString());
+      _intervalStockage = Duration(
+        minutes: int.tryParse(u['interval_stockage']?.toString() ?? '') ?? 10,
+      );
+      _intervalSync = Duration(
+        minutes: int.tryParse(u['interval_sync']?.toString() ?? '') ?? 30,
+      );
     }
 
     setState(() => _user = users);
@@ -117,8 +150,9 @@ class _ProfilePageState extends State<ProfilePage> {
     required String title,
     required IconData icon,
     required Color color,
-    required int current,
-    required ValueChanged<int> onSelected,
+    required List<_Interval> intervals,
+    required Duration current,
+    required ValueChanged<Duration> onSelected,
   }) async {
     await showModalBottomSheet<void>(
       context: context,
@@ -129,6 +163,7 @@ class _ProfilePageState extends State<ProfilePage> {
             title: title,
             icon: icon,
             color: color,
+            intervals: intervals,
             current: current,
             onSelected: (v) {
               onSelected(v);
@@ -396,23 +431,25 @@ class _ProfilePageState extends State<ProfilePage> {
           const Divider(height: 1, thickness: 1, color: Color(0xFFF0F4FF)),
 
           // ── Affichage ─────────────────────────────────────────────────────
+          // Stocké en SECONDES pour autoriser 30 s, 2 min, 3 min…
           _buildIntervalRow(
             label: 'Affichage',
             subtitle: 'Rafraîchissement écran',
             icon: Icons.monitor_rounded,
             color: Colours.app_main,
+            intervals: _kIntervalsAffichage,
             current: _intervalAffichage,
-            onTap:
-                () => _pickInterval(
-                  title: 'Intervalle Affichage',
-                  icon: Icons.monitor_rounded,
-                  color: Colours.app_main,
-                  current: _intervalAffichage,
-                  onSelected: (v) {
-                    setState(() => _intervalAffichage = v);
-                    _saveInterval('interval_affichage', v);
-                  },
-                ),
+            onTap: () => _pickInterval(
+              title: 'Intervalle Affichage',
+              icon: Icons.monitor_rounded,
+              color: Colours.app_main,
+              intervals: _kIntervalsAffichage,
+              current: _intervalAffichage,
+              onSelected: (v) {
+                setState(() => _intervalAffichage = v);
+                _saveInterval('interval_affichage', v.inSeconds);
+              },
+            ),
           ),
 
           const Padding(
@@ -421,23 +458,25 @@ class _ProfilePageState extends State<ProfilePage> {
           ),
 
           // ── Stockage ──────────────────────────────────────────────────────
+          // Stocké en MINUTES (granularité minute, pas de besoin sub-minute).
           _buildIntervalRow(
             label: 'Stockage',
             subtitle: 'Enregistrement local',
             icon: Icons.storage_rounded,
             color: const Color(0xFF8B5CF6),
+            intervals: _kIntervalsMinutes,
             current: _intervalStockage,
-            onTap:
-                () => _pickInterval(
-                  title: 'Intervalle Stockage',
-                  icon: Icons.storage_rounded,
-                  color: const Color(0xFF8B5CF6),
-                  current: _intervalStockage,
-                  onSelected: (v) {
-                    setState(() => _intervalStockage = v);
-                    _saveInterval('interval_stockage', v);
-                  },
-                ),
+            onTap: () => _pickInterval(
+              title: 'Intervalle Stockage',
+              icon: Icons.storage_rounded,
+              color: const Color(0xFF8B5CF6),
+              intervals: _kIntervalsMinutes,
+              current: _intervalStockage,
+              onSelected: (v) {
+                setState(() => _intervalStockage = v);
+                _saveInterval('interval_stockage', v.inMinutes);
+              },
+            ),
           ),
 
           const Padding(
@@ -446,21 +485,24 @@ class _ProfilePageState extends State<ProfilePage> {
           ),
 
           // ── Synchronisation ───────────────────────────────────────────────
+          // Stocké en MINUTES.
           _buildIntervalRow(
             label: 'Synchronisation',
             subtitle: 'Envoi vers le serveur',
             icon: Icons.sync_rounded,
             color: const Color(0xFF059669),
+            intervals: _kIntervalsMinutes,
             current: _intervalSync,
             onTap: () {
               _pickInterval(
                 title: 'Intervalle Synchronisation',
                 icon: Icons.sync_rounded,
                 color: const Color(0xFF059669),
+                intervals: _kIntervalsMinutes,
                 current: _intervalSync,
                 onSelected: (v) {
                   setState(() => _intervalSync = v);
-                  _saveInterval('interval_sync', v);
+                  _saveInterval('interval_sync', v.inMinutes);
                 },
               );
             },
@@ -477,16 +519,16 @@ class _ProfilePageState extends State<ProfilePage> {
     required String subtitle,
     required IconData icon,
     required Color color,
-    required int current,
+    required List<_Interval> intervals,
+    required Duration current,
     required VoidCallback onTap,
   }) {
-    final intervalLabel =
-        _kIntervals
-            .firstWhere(
-              (i) => i.minutes == current,
-              orElse: () => _Interval('$current min', current),
-            )
-            .label;
+    final intervalLabel = intervals
+        .firstWhere(
+          (i) => i.duration == current,
+          orElse: () => _Interval(_humanizeDuration(current), current),
+        )
+        .label;
 
     return InkWell(
       onTap: onTap,
@@ -678,11 +720,26 @@ class _ProfilePageState extends State<ProfilePage> {
 
 // ─── Bottom-sheet sélecteur ───────────────────────────────────────────────────
 
+/// Format compact pour la pastille gauche (ex. "30s", "2m", "1h").
+String _shortDurationLabel(Duration d) {
+  if (d.inSeconds < 60) return '${d.inSeconds}s';
+  if (d.inMinutes < 60) return '${d.inMinutes}m';
+  return '${d.inHours}h';
+}
+
+/// Format lisible pour fallback (ex. "45 secondes", "7 minutes").
+String _humanizeDuration(Duration d) {
+  if (d.inSeconds < 60) return '${d.inSeconds} s';
+  if (d.inMinutes < 60) return '${d.inMinutes} min';
+  return '${d.inHours} h';
+}
+
 class _IntervalPicker extends StatelessWidget {
   const _IntervalPicker({
     required this.title,
     required this.icon,
     required this.color,
+    required this.intervals,
     required this.current,
     required this.onSelected,
   });
@@ -690,8 +747,9 @@ class _IntervalPicker extends StatelessWidget {
   final String title;
   final IconData icon;
   final Color color;
-  final int current;
-  final ValueChanged<int> onSelected;
+  final List<_Interval> intervals;
+  final Duration current;
+  final ValueChanged<Duration> onSelected;
 
   @override
   Widget build(BuildContext context) {
@@ -745,10 +803,10 @@ class _IntervalPicker extends StatelessWidget {
           const Divider(height: 1),
 
           // Liste des options
-          ..._kIntervals.map((interval) {
-            final selected = interval.minutes == current;
+          ...intervals.map((interval) {
+            final selected = interval.duration == current;
             return InkWell(
-              onTap: () => onSelected(interval.minutes),
+              onTap: () => onSelected(interval.duration),
               child: Container(
                 padding: const EdgeInsets.symmetric(
                   horizontal: 20,
@@ -760,7 +818,7 @@ class _IntervalPicker extends StatelessWidget {
                         : Colors.transparent,
                 child: Row(
                   children: [
-                    // Icône horloge avec valeur
+                    // Icône horloge avec valeur compacte (ex. "30s", "5m", "1h")
                     Container(
                       width: 40,
                       height: 40,
@@ -773,7 +831,7 @@ class _IntervalPicker extends StatelessWidget {
                       ),
                       child: Center(
                         child: Text(
-                          interval.minutes < 60 ? '${interval.minutes}m' : '1h',
+                          _shortDurationLabel(interval.duration),
                           style: TextStyle(
                             fontSize: 12,
                             fontWeight: FontWeight.w800,

@@ -1,3 +1,4 @@
+import 'dart:io' show Platform;
 import 'package:flutter/material.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:siot_driver_pro/core/constants/colors.dart';
@@ -26,7 +27,9 @@ class NotifiOffScreen extends StatelessWidget {
             MaterialButton(
               onPressed: () async {
                 await Permission.notification.request();
-                await Permission.ignoreBatteryOptimizations.request();
+                if (Platform.isAndroid) {
+                  await Permission.ignoreBatteryOptimizations.request();
+                }
               },
               padding: const EdgeInsets.symmetric(horizontal: 30, vertical: 12),
               shape: RoundedRectangleBorder(

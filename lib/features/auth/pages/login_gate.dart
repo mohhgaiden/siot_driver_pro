@@ -1,5 +1,5 @@
 import 'dart:async';
-import 'dart:io';
+import 'dart:io' show Platform;
 import 'package:flutter/material.dart';
 import 'package:flutter_blue_plus/flutter_blue_plus.dart';
 import 'package:flutter_foreground_task/flutter_foreground_task.dart';
@@ -49,7 +49,7 @@ class _MainScreenState extends State<MainScreen> {
     }
 
     // Show the dialog and wait for user to tap Continue
-    if (Platform.isAndroid && mounted) {
+    if (mounted) {
       await showDialog(
         context: context,
         barrierDismissible: false, // user must tap the button
@@ -118,12 +118,14 @@ class _MainScreenState extends State<MainScreen> {
     // 3. Background location (Android shows its own system dialog here)
     await Permission.locationAlways.request();
 
-    // 4. Notification + battery
+    // 4. Notification + battery (ignoreBatteryOptimizations is Android-only)
     await Permission.notification.request();
-    await Permission.ignoreBatteryOptimizations.request();
+    if (Platform.isAndroid) {
+      await Permission.ignoreBatteryOptimizations.request();
+    }
 
-    // 5. AFTER permissions → start foreground service
-    if (!(await FlutterForegroundTask.isRunningService)) {
+    // 5. AFTER permissions → start foreground service (Android only)
+    if (Platform.isAndroid && !(await FlutterForegroundTask.isRunningService)) {
       await FlutterForegroundTask.startService(
         notificationTitle: 'SIOT Driver',
         notificationText: 'Running in background...',
@@ -142,12 +144,9 @@ class _MainScreenState extends State<MainScreen> {
     gpsEnabled = await location.serviceEnabled();
     notify = await Permission.notification.status;
     permission = await Permission.location.status;
-    // Android only
-  if (Platform.isAndroid) {
-    background = await Permission.ignoreBatteryOptimizations.status;
-  } else {
-    background = PermissionStatus.granted;
-  }
+    background = Platform.isAndroid
+        ? await Permission.ignoreBatteryOptimizations.status
+        : PermissionStatus.granted;
     setState(() {});
   }
 
@@ -198,10 +197,9 @@ class _MainScreenState extends State<MainScreen> {
               ? BluetoothOffScreen(adapterState: adapterState)
               : (!gpsEnabled || permission == PermissionStatus.denied)
               ? GpsOffScreen(gpsEnabled: gpsEnabled, permission: permission)
-              : ((notify.isDenied || notify.isPermanentlyDenied) ||
-    (Platform.isAndroid &&
-        (background.isDenied || background.isPermanentlyDenied)))
-? NotifiOffScreen(notify: notify, background: background)
+              : (notify == PermissionStatus.denied ||
+                  background == PermissionStatus.denied)
+              ? NotifiOffScreen(notify: notify, background: background)
               : Hive.box('LOGGED_IN_USER').length == 0
               ? LoginPage()
               : HomePage(),

@@ -1,43 +1,35 @@
-import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:hive_flutter/hive_flutter.dart';
+import 'package:intl/date_symbol_data_local.dart';
+import 'package:siot_driver_pro/features/auth/pages/login_gate.dart';
 import 'package:siot_driver_pro/core/theme/light.dart';
 import 'package:siot_driver_pro/core/utils/notification.dart';
-import 'package:siot_driver_pro/features/auth/pages/login_gate.dart';
+
 import 'package:flutter_foreground_task/flutter_foreground_task.dart';
-import 'foreground_service.dart';
+import 'foreground_service.dart'; // where BleTaskHandler is
 
 @pragma('vm:entry-point')
 void startCallback() {
-  // Let onStart() handle the platform guard internally
   FlutterForegroundTask.setTaskHandler(BleTaskHandler());
 }
 
-Future<void> main() async {
+void main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  await _initializeApp();
-  runApp(const MyApp());
-}
-
-Future<void> _initializeApp() async {
-  try {
-    await _initServices();
-    if (Platform.isAndroid) {
-      await _initForegroundTask();
-    }
-    _configureApp();
-  } catch (e) {
-    debugPrint('INIT ERROR: $e');
-  }
-}
-
-Future<void> _initForegroundTask() async {
+  // 🚀 BUILD MARKER — si vous voyez cette ligne, vous tournez avec la nouvelle
+  // version du code (storage 1 min + CapteurSync). Sinon, c'est l'ancienne app.
+  debugPrint('🚀 SIOT Driver — build du ${DateTime.now()} — '
+      'avec stockage régulier + CapteurSync');
+  // Localisation des dates en français (calendrier, DateFormat)
+  await initializeDateFormatting('fr_FR', null);
+  await _initServices();
+  // ✅ INIT FOREGROUND TASK
   FlutterForegroundTask.init(
     androidNotificationOptions: AndroidNotificationOptions(
       channelId: 'siot_channel',
       channelName: 'SIOT Background Service',
-      channelDescription: 'Keeps BLE scanning active',
+      channelDescription: 'This notification keeps BLE running',
       channelImportance: NotificationChannelImportance.LOW,
       priority: NotificationPriority.LOW,
     ),
@@ -50,13 +42,12 @@ Future<void> _initForegroundTask() async {
       allowWifiLock: true,
     ),
   );
+  _configureApp();
+  runApp(const MyApp());
 }
 
 Future<void> _initServices() async {
-  // NotificationService is Android-only — guard it
-  if (Platform.isAndroid) {
-    await NotificationService.init();
-  }
+  await NotificationService.init();
   await _initHive();
 }
 
@@ -83,13 +74,11 @@ void _configureApp() {
   );
   SystemChrome.setPreferredOrientations([
     DeviceOrientation.portraitUp,
+    DeviceOrientation.portraitDown,
   ]);
   SystemChrome.setEnabledSystemUIMode(
     SystemUiMode.manual,
-    overlays: [
-      SystemUiOverlay.top,
-      SystemUiOverlay.bottom,
-    ],
+    overlays: [SystemUiOverlay.bottom, SystemUiOverlay.top],
   );
 }
 
@@ -99,9 +88,17 @@ class MyApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'S-IOT Driver',
+      title: 'Siot Driver Pro',
       debugShowCheckedModeBanner: false,
       theme: LightTheme().light(),
+      // Localisations : français en premier, fallback anglais
+      localizationsDelegates: const [
+        GlobalMaterialLocalizations.delegate,
+        GlobalWidgetsLocalizations.delegate,
+        GlobalCupertinoLocalizations.delegate,
+      ],
+      supportedLocales: const [Locale('fr', 'FR'), Locale('en', 'US')],
+      locale: const Locale('fr', 'FR'),
       home: const MainScreen(),
     );
   }

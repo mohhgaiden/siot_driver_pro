@@ -47,7 +47,8 @@
             android:name="com.pravera.flutter_foreground_task.service.ForegroundService"
             android:exported="false"
             android:foregroundServiceType="connectedDevice|location" />
-            #android:foregroundServiceType="dataSync|location"
+        <!-- alternative: android:foregroundServiceType="dataSync|location" -->
+
 
         <activity
             android:name=".MainActivity"

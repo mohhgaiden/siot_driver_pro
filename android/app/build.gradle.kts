@@ -29,7 +29,7 @@ android {
     }
 
     defaultConfig {
-        applicationId = "com.siriusnet.siot.driver" 
+        applicationId = "com.siriusnet.siot.driver"
         minSdk = 23
         targetSdk = 36
         versionCode = flutter.versionCode
@@ -39,16 +39,20 @@ android {
 
     signingConfigs {
         create("release") {
-            keyAlias = keystoreProperties["keyAlias"] as String
-            keyPassword = keystoreProperties["keyPassword"] as String
-            storeFile = keystoreProperties["storeFile"]?.let { file(it) }
-            storePassword = keystoreProperties["storePassword"] as String
+            keyAlias = keystoreProperties["keyAlias"] as String? ?: ""
+            keyPassword = keystoreProperties["keyPassword"] as String? ?: ""
+            storeFile = (keystoreProperties["storeFile"] as String?)?.let { file(it) }
+            storePassword = keystoreProperties["storePassword"] as String? ?: ""
         }
     }
     buildTypes {
         release {
-            signingConfig = signingConfigs.getByName("debug")
-            signingConfig = signingConfigs.getByName("release")
+            // Si key.properties existe → signature release ; sinon fallback sur debug
+            signingConfig = if (keystorePropertiesFile.exists()) {
+                signingConfigs.getByName("release")
+            } else {
+                signingConfigs.getByName("debug")
+            }
         }
     }
 }

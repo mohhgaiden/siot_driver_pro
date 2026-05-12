@@ -1,16 +1,15 @@
 name: siot_driver_pro
 description: A new Flutter project.
 publish_to: 'none'
-
-
-version: 1.0.0+3
-#2.0.6+21
+version: 2.0.7+22
 
 environment:
-  sdk: ">=3.1.0 <4.0.0"
+  sdk: ^3.7.2
 
 dependencies:
   flutter:
+    sdk: flutter
+  flutter_localizations:
     sdk: flutter
   cupertino_icons: ^1.0.8
   keyboard_actions: ^4.2.0
@@ -21,7 +20,7 @@ dependencies:
   hive_flutter: ^1.1.0
   flutter_xlider: ^3.0.1
   flutter_local_notifications: ^18.0.1
-  intl: ^0.20.2
+  intl: 0.19.0
   common_utils: ^2.1.0
   table_calendar: ^3.1.2
   pdf: ^3.11.1
@@ -47,13 +46,11 @@ dev_dependencies:
   flutter_test:
     sdk: flutter
   flutter_launcher_icons: ^0.14.3
-  flutter_lints: ^3.0.0
+  flutter_lints: ^5.0.0
 
 flutter_icons:
-  ios: true
   android: true
   image_path: "assets/images/login/logo_dark.png"
-  remove_alpha_ios: true
 
 flutter:
   uses-material-design: true

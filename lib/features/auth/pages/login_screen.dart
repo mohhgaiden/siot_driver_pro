@@ -6,6 +6,7 @@ import 'package:flutter/services.dart';
 import 'package:keyboard_actions/keyboard_actions.dart';
 import '../../../core/constants/gaps.dart';
 import '../../../core/constants/styles.dart';
+import '../../../core/services/capteur_sync.dart';
 import '../../../core/utils/change_notifier_manage.dart';
 import '../../../common/my_button.dart';
 import '../../../common/my_scroll_view.dart';
@@ -97,58 +98,6 @@ class _LoginPageState extends State<LoginPage>
     }
   }
 
-  void _listCapteur(String uuid) async {
-    final response = await http.post(
-      Uri.parse(
-        'https://sirius-iot.app/Admin/Mobile/API/SiotDriver2022/Android/list_Tags_Readings.php',
-      ),
-      body: {'uuid_user': uuid},
-    );
-    final result = jsonDecode(response.body);
-    if (result['LIST_CAPTEURS']['error'] == 'false' &&
-        Hive.box('LIST_CAPTEURS').isEmpty) {
-      for (int i = 0; i < result['LIST_CAPTEURS']['Nbr_capteurs']; i++) {
-        await Hive.box('LIST_CAPTEURS').add({
-          'MacAddrs': result['LIST_CAPTEURS']['LIST'][i]['MacAddrs'],
-          'Name': result['LIST_CAPTEURS']['LIST'][i]['Name'],
-          'Type': result['LIST_CAPTEURS']['LIST'][i]['Type'],
-          'RemoteAlert': result['LIST_CAPTEURS']['LIST'][i]['RemoteAlert'],
-          'Option_stockage':
-              result['LIST_CAPTEURS']['LIST'][i]['Option_stockage'],
-          'interval_stockage':
-              result['LIST_CAPTEURS']['LIST'][i]['interval_stockage'],
-        });
-        final mac = result['LIST_CAPTEURS']['LIST'][i]['MacAddrs'];
-        final alreadyExists =
-            _itemsAlert.isNotEmpty &&
-            _itemsAlert.any(
-              (e) => e['uuid_user'] == uuid && e['MacAddrs'] == mac,
-            );
-        if (!alreadyExists) {
-          await Hive.box('Alert').add({
-            'uuid_user': uuid,
-            'MacAddrs': mac,
-            'checkedtemperature': '0',
-            'lowtemperature': -40.0,
-            'hightemperature': 85.0,
-            'checkedhumidity': '0',
-            'lowhumidity': 0.0,
-            'highhumidity': 100.0,
-            'checkedpresure': '0',
-            'lowpresure': 300.0,
-            'highpresure': 1100.0,
-            'checkedsignal_strength': '0',
-            'lowsignal_strength': -105.0,
-            'highsignal_strength': 0.0,
-            'checkedluminosite': '0',
-            'lowluminosite': 0.0,
-            'highluminosite': 83000.0,
-          });
-        }
-      }
-    }
-  }
-
   void _login(String name, String pass) async {
     final response = await http.post(
       Uri.parse(
@@ -225,7 +174,9 @@ class _LoginPageState extends State<LoginPage>
               result['LOGGED_IN_USER']['user_clear_interval'],
           'user_store_interval':
               result['LOGGED_IN_USER']['user_store_interval'],
-          'interval_affichage': "5",
+          // ⚠️ `interval_affichage` est stocké en SECONDES
+          // (60 = 1 minute, valeur par défaut). Les autres restent en minutes.
+          'interval_affichage': "60",
           'interval_stockage': "10",
           'interval_sync': "30",
         });
@@ -239,7 +190,7 @@ class _LoginPageState extends State<LoginPage>
       } else {
         Hive.box('USER_PASS').clear();
       }
-      _listCapteur(result['LOGGED_IN_USER']['uuid_user']);
+      await CapteurSync.sync(result['LOGGED_IN_USER']['uuid_user']);
     }
 
     setState(() {
