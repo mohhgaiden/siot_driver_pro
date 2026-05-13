@@ -1,3 +1,5 @@
+import 'dart:io' show Platform;
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
@@ -24,24 +26,26 @@ void main() async {
   // Localisation des dates en français (calendrier, DateFormat)
   await initializeDateFormatting('fr_FR', null);
   await _initServices();
-  // ✅ INIT FOREGROUND TASK
-  FlutterForegroundTask.init(
-    androidNotificationOptions: AndroidNotificationOptions(
-      channelId: 'siot_channel',
-      channelName: 'SIOT Background Service',
-      channelDescription: 'This notification keeps BLE running',
-      channelImportance: NotificationChannelImportance.LOW,
-      priority: NotificationPriority.LOW,
-    ),
-    iosNotificationOptions: const IOSNotificationOptions(),
-    foregroundTaskOptions: const ForegroundTaskOptions(
-      interval: 5000,
-      isOnceEvent: false,
-      autoRunOnBoot: true,
-      allowWakeLock: true,
-      allowWifiLock: true,
-    ),
-  );
+  // Foreground task is Android-only — skip init on iOS to avoid launch crash
+  if (Platform.isAndroid) {
+    FlutterForegroundTask.init(
+      androidNotificationOptions: AndroidNotificationOptions(
+        channelId: 'siot_channel',
+        channelName: 'SIOT Background Service',
+        channelDescription: 'This notification keeps BLE running',
+        channelImportance: NotificationChannelImportance.LOW,
+        priority: NotificationPriority.LOW,
+      ),
+      iosNotificationOptions: const IOSNotificationOptions(),
+      foregroundTaskOptions: const ForegroundTaskOptions(
+        interval: 5000,
+        isOnceEvent: false,
+        autoRunOnBoot: true,
+        allowWakeLock: true,
+        allowWifiLock: true,
+      ),
+    );
+  }
   _configureApp();
   runApp(const MyApp());
 }
