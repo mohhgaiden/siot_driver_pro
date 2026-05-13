@@ -9,7 +9,7 @@
     },
     {
       "name": "archive",
-      "rootUri": "file:///C:/Users/moh/AppData/Local/Pub/Cache/hosted/pub.dev/archive-3.6.1",
+      "rootUri": "file:///C:/Users/moh/AppData/Local/Pub/Cache/hosted/pub.dev/archive-4.0.9",
       "packageUri": "lib/",
       "languageVersion": "3.0"
     },
@@ -183,9 +183,9 @@
     },
     {
       "name": "flutter_foreground_task",
-      "rootUri": "file:///C:/Users/moh/AppData/Local/Pub/Cache/hosted/pub.dev/flutter_foreground_task-6.5.0",
+      "rootUri": "file:///C:/Users/moh/AppData/Local/Pub/Cache/hosted/pub.dev/flutter_foreground_task-8.17.0",
       "packageUri": "lib/",
-      "languageVersion": "2.18"
+      "languageVersion": "3.0"
     },
     {
       "name": "flutter_launcher_icons",
@@ -560,6 +560,12 @@
       "languageVersion": "3.0"
     },
     {
+      "name": "posix",
+      "rootUri": "file:///C:/Users/moh/AppData/Local/Pub/Cache/hosted/pub.dev/posix-6.5.0",
+      "packageUri": "lib/",
+      "languageVersion": "3.0"
+    },
+    {
       "name": "qr",
       "rootUri": "file:///C:/Users/moh/AppData/Local/Pub/Cache/hosted/pub.dev/qr-3.0.1",
       "packageUri": "lib/",
@@ -752,7 +758,7 @@
       "languageVersion": "3.7"
     }
   ],
-  "generated": "2026-05-13T10:28:08.955121Z",
+  "generated": "2026-05-13T11:29:27.814576Z",
   "generator": "pub",
   "generatorVersion": "3.7.2",
   "flutterRoot": "file:///C:/FlutterDev/flutter",
