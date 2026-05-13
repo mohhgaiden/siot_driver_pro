@@ -250,6 +250,57 @@ class _HomePageState extends State<HomePage> {
     super.dispose();
   }
 
+  // ─── iOS MAC resolution ──────────────────────────────────────────────────────
+
+  // On iOS, CoreBluetooth exposes a UUID instead of the Bluetooth MAC address.
+  // This tries to recover the actual MAC from the BLE advertisement payload so
+  // that sensor matching against LIST_CAPTEURS (which stores MACs) still works.
+
+  static String _bytesToMac(List<int> b) =>
+      b.map((v) => v.toRadixString(16).padLeft(2, '0').toUpperCase()).join(':');
+
+  static String? _extractMacFromAdv(AdvertisementData adv) {
+    // Type 1 – Ruuvi RAWv2 v5 (company 0x0499 = 1177)
+    // Per spec: MAC address occupies bytes 18-23 of the 24-byte payload.
+    final d1 = adv.manufacturerData[1177];
+    if (d1 != null && d1.length >= 24) {
+      return _bytesToMac(d1.sublist(18, 24));
+    }
+    // Type 10 (company 0x0CCE = 3278) – many vendors put MAC at bytes 0-5.
+    final d10 = adv.manufacturerData[3278];
+    if (d10 != null && d10.length >= 6) {
+      return _bytesToMac(d10.sublist(0, 6));
+    }
+    // Type 6 (company 0xFFFF = 65535) – try bytes 0-5 as MAC.
+    final d6 = adv.manufacturerData[65535];
+    if (d6 != null && d6.length >= 6) {
+      return _bytesToMac(d6.sublist(0, 6));
+    }
+    return null;
+  }
+
+  // Returns the effective MAC to use for LIST_CAPTEURS matching.
+  // On Android the remoteId IS the MAC; on iOS we extract it from the adv data.
+  String _resolveDeviceMac(ScanResult result) {
+    if (!Platform.isIOS) return result.device.remoteId.str;
+    final extracted = _extractMacFromAdv(result.advertisementData);
+    if (kDebugMode) {
+      if (extracted != null) {
+        debugPrint(
+          '🍎 iOS extracted MAC: $extracted '
+          '(UUID: ${result.device.remoteId.str})',
+        );
+      } else {
+        debugPrint(
+          '🍎 iOS no MAC in adv for UUID: ${result.device.remoteId.str} '
+          'mfgKeys=${result.advertisementData.manufacturerData.keys.toList()} '
+          'svcKeys=${result.advertisementData.serviceData.keys.toList()}',
+        );
+      }
+    }
+    return extracted ?? result.device.remoteId.str;
+  }
+
   // ─── Bluetooth ───────────────────────────────────────────────────────────────
 
   // Watchdog & restart périodique du scan BLE
@@ -466,7 +517,7 @@ class _HomePageState extends State<HomePage> {
     final now = DateTime.now();
 
     for (final result in scans) {
-      final mac = result.device.remoteId.str;
+      final mac = _resolveDeviceMac(result);
 
       for (int j = 0; j < _capteursBox.length; j++) {
         final raw = _capteursBox.getAt(j);
@@ -574,7 +625,7 @@ class _HomePageState extends State<HomePage> {
     final nowMs = DateTime.now().millisecondsSinceEpoch;
 
     for (final result in scans) {
-      final mac = result.device.remoteId.str;
+      final mac = _resolveDeviceMac(result);
       final macKey = mac.toLowerCase();
 
       // ✅ Filtre par intervalle utilisateur (clé MAC lowercase)
@@ -1217,7 +1268,7 @@ class _HomePageState extends State<HomePage> {
     final entries = <_SensorEntry>[];
     final seenKeys = <String>{};
     for (final result in _scanResults) {
-      final mac = result.device.remoteId.str;
+      final mac = _resolveDeviceMac(result);
       for (int j = 0; j < _capteursBox.length; j++) {
         // ✅ Safe Hive access — no more 'as Map' cast crash
         final raw = _capteursBox.getAt(j);
@@ -1274,7 +1325,7 @@ class _HomePageState extends State<HomePage> {
 
     // 3) Génération des widgets dans l'ordre trié.
     final cards = entries.map((e) {
-      final mac = e.result.device.remoteId.str;
+      final mac = _resolveDeviceMac(e.result);
       return Padding(
         key: ValueKey('card_${mac}_${e.type}'),
         padding: const EdgeInsets.only(bottom: 10),

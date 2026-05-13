@@ -193,7 +193,7 @@ class _MainScreenState extends State<MainScreen> {
 
     return Scaffold(
       body:
-          adapterState == BluetoothAdapterState.off
+          adapterState != BluetoothAdapterState.on
               ? BluetoothOffScreen(adapterState: adapterState)
               : (!gpsEnabled || permission == PermissionStatus.denied)
               ? GpsOffScreen(gpsEnabled: gpsEnabled, permission: permission)
