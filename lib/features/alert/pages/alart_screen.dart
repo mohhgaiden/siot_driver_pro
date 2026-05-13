@@ -16,10 +16,11 @@ class AlartScreen extends StatefulWidget {
     required this.id,
     required this.result,
     required this.type,
+    required this.mac,
   });
 
   final ScanResult result;
-  final String name, id, type;
+  final String name, id, type, mac;
 
   @override
   State<AlartScreen> createState() => _AlartScreenState();
@@ -41,7 +42,7 @@ class _AlartScreenState extends State<AlartScreen> {
   bool onLight = false;
   double minLight = 0, maxLight = 83000;
 
-  late int _index;
+  int? _index;
 
   @override
   void initState() {
@@ -51,10 +52,9 @@ class _AlartScreenState extends State<AlartScreen> {
 
   void _loadAlertData() {
     final box = Hive.box('Alert');
-    final mac = widget.result.device.remoteId.str;
     for (int i = 0; i < box.length; i++) {
       final item = box.getAt(i);
-      if (item == null || item['MacAddrs'] != mac) continue;
+      if (item == null || item['MacAddrs'] != widget.mac) continue;
       setState(() {
         onTemp = item['checkedtemperature'] == '1';
         minTemp = (item['lowtemperature'] as num).toDouble();
@@ -78,9 +78,10 @@ class _AlartScreenState extends State<AlartScreen> {
   }
 
   Future<void> _save() async {
-    await Hive.box('Alert').putAt(_index, {
+    final box = Hive.box('Alert');
+    final data = {
       'uuid_user': widget.id,
-      'MacAddrs': widget.result.device.remoteId.str,
+      'MacAddrs': widget.mac,
       'checkedtemperature': onTemp ? '1' : '0',
       'lowtemperature': minTemp,
       'hightemperature': maxTemp,
@@ -96,7 +97,12 @@ class _AlartScreenState extends State<AlartScreen> {
       'checkedluminosite': onLight ? '1' : '0',
       'lowluminosite': minLight,
       'highluminosite': maxLight,
-    });
+    };
+    if (_index != null) {
+      await box.putAt(_index!, data);
+    } else {
+      await box.add(data);
+    }
     if (mounted) Navigator.pop(context);
   }
 

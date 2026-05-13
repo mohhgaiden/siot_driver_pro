@@ -203,6 +203,7 @@ class ScanResultCard extends StatefulWidget {
     required this.result,
     required this.sensorType,
     required this.type,
+    required this.mac,
     this.showAlert = false,
     this.showPrint = false,
     this.showReport = false,
@@ -211,6 +212,7 @@ class ScanResultCard extends StatefulWidget {
   final ScanResult result;
   final String name;
   final String type;
+  final String mac;
   final SensorType sensorType;
   final bool showAlert;
   final bool showPrint;
@@ -226,7 +228,7 @@ class _ScanResultCardState extends State<ScanResultCard> {
   Timer? _timer;
   Map<String, dynamic>? _alertData;
 
-  String get _mac => widget.result.device.remoteId.str;
+  String get _mac => widget.mac;
   String get _userId => _userBox.getAt(0)['uuid_user'];
 
   @override
@@ -560,6 +562,7 @@ class _ScanResultCardState extends State<ScanResultCard> {
                               id: _userId,
                               result: widget.result,
                               type: widget.type,
+                              mac: widget.mac,
                             ),
                       ),
                     ),

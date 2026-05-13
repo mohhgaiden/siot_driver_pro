@@ -53,23 +53,23 @@
 	<!-- ========================= -->
 
 	<key>NSBluetoothAlwaysUsageDescription</key>
-	<string>This app uses Bluetooth to connect to nearby devices.</string>
+	<string>S-IOT Driver uses Bluetooth to continuously scan for and connect to nearby BLE environmental sensors (temperature, humidity, pressure). For example, the app detects your paired "RuuviTag" sensor and records its live temperature readings even when the app is in the background.</string>
 
 	<key>NSBluetoothPeripheralUsageDescription</key>
-	<string>This app uses Bluetooth to communicate with nearby BLE devices.</string>
+	<string>S-IOT Driver uses Bluetooth to communicate with BLE environmental sensors. For example, the app reads temperature, humidity, and pressure data broadcast by your paired sensor and logs it for monitoring and reporting.</string>
 
 	<!-- ========================= -->
 	<!-- LOCATION -->
 	<!-- ========================= -->
 
 	<key>NSLocationWhenInUseUsageDescription</key>
-	<string>This app requires location access while using the app.</string>
+	<string>S-IOT Driver uses your location to attach GPS coordinates to sensor readings while you are using the app. For example, when a temperature alert is recorded, the app saves the GPS position so you can see exactly where the reading was taken in reports.</string>
 
 	<key>NSLocationAlwaysAndWhenInUseUsageDescription</key>
-	<string>This app requires background location access.</string>
+	<string>S-IOT Driver uses your location in the background to continuously tag sensor readings with GPS coordinates during active monitoring missions. For example, while running a delivery mission, each sensor reading is stamped with its location so you can trace the environmental conditions along the route.</string>
 
 	<key>NSLocationAlwaysUsageDescription</key>
-	<string>This app requires continuous location access.</string>
+	<string>S-IOT Driver uses your location at all times to tag sensor readings with GPS coordinates during monitoring missions. For example, each temperature or humidity log entry is stamped with the location where it was recorded, enabling full traceability in exported reports.</string>
 
 	<!-- ========================= -->
 	<!-- LOCAL NETWORK -->

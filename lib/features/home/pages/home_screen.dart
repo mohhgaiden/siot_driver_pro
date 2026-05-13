@@ -1334,6 +1334,7 @@ class _HomePageState extends State<HomePage> {
           result: e.result,
           name: e.name,
           type: e.type,
+          mac: mac,
           sensorType: e.sensorType,
           showAlert: showAlert,
           showPrint: showPrint,
