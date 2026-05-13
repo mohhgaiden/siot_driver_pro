@@ -10,7 +10,6 @@ import 'package:flutter_foreground_task/flutter_foreground_task.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:hive_flutter/hive_flutter.dart';
 import 'package:http/http.dart' as http;
-import 'package:internet_connection_checker_plus/internet_connection_checker_plus.dart';
 
 import '../../../common/load_image.dart';
 import '../../../common/popup_window.dart';
@@ -707,6 +706,17 @@ class _HomePageState extends State<HomePage> {
 
   // ─── Connectivity & API sync ──────────────────────────────────────────────────
 
+  Future<bool> _hasInternetAccess() async {
+    try {
+      final response = await http
+          .head(Uri.parse('https://www.google.com'))
+          .timeout(const Duration(seconds: 5));
+      return response.statusCode < 500;
+    } catch (_) {
+      return false;
+    }
+  }
+
   Future<void> _checkConnectivity() async {
     final intervalSync =
         int.tryParse(_user['interval_sync']?.toString() ?? '30') ?? 30;
@@ -718,7 +728,7 @@ class _HomePageState extends State<HomePage> {
       return;
     }
 
-    final hasInternet = await InternetConnection().hasInternetAccess;
+    final hasInternet = await _hasInternetAccess();
     if (!hasInternet) return;
 
     _isSyncing = true;
@@ -924,7 +934,7 @@ class _HomePageState extends State<HomePage> {
     // 2) Tentative d'envoi immédiat (best-effort, ne bloque pas l'UI).
     bool sent = false;
     try {
-      final hasInternet = await InternetConnection().hasInternetAccess;
+      final hasInternet = await _hasInternetAccess();
       if (hasInternet) {
         sent = await _syncActivityByKey(key);
       } else {
