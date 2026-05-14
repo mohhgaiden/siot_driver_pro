@@ -257,25 +257,27 @@ class _HomePageState extends State<HomePage> {
   // ─── iOS MAC resolution ──────────────────────────────────────────────────────
 
   // On iOS, CoreBluetooth exposes a UUID instead of the Bluetooth MAC address.
-  // This tries to recover the actual MAC from the BLE advertisement payload so
-  // that sensor matching against LIST_CAPTEURS (which stores MACs) still works.
+  // We try multiple strategies to recover the real MAC so sensor matching
+  // against LIST_CAPTEURS (which stores MACs) still works.
 
   static String _bytesToMac(List<int> b) =>
       b.map((v) => v.toRadixString(16).padLeft(2, '0').toUpperCase()).join(':');
 
+  static bool _looksLikeMac(String s) =>
+      RegExp(r'^([0-9A-Fa-f]{2}:){5}[0-9A-Fa-f]{2}$').hasMatch(s);
+
   static String? _extractMacFromAdv(AdvertisementData adv) {
     // Type 1 – Ruuvi RAWv2 v5 (company 0x0499 = 1177)
-    // Per spec: MAC address occupies bytes 18-23 of the 24-byte payload.
     final d1 = adv.manufacturerData[1177];
     if (d1 != null && d1.length >= 24) {
       return _bytesToMac(d1.sublist(18, 24));
     }
-    // Type 10 (company 0x0CCE = 3278) – many vendors put MAC at bytes 0-5.
+    // Type 10 (company 0x0CCE = 3278)
     final d10 = adv.manufacturerData[3278];
     if (d10 != null && d10.length >= 6) {
       return _bytesToMac(d10.sublist(0, 6));
     }
-    // Type 6 (company 0xFFFF = 65535) – try bytes 0-5 as MAC.
+    // Type 6 (company 0xFFFF = 65535)
     final d6 = adv.manufacturerData[65535];
     if (d6 != null && d6.length >= 6) {
       return _bytesToMac(d6.sublist(0, 6));
@@ -297,17 +299,32 @@ class _HomePageState extends State<HomePage> {
   void _saveIosUuidMapping(String uuid, String mac) {
     _iosUuidToMacCache[uuid] = mac;
     Hive.box('IOS_UUID_MAC').put(uuid, mac);
-    debugPrint('🍎 iOS UUID→MAC auto-mapped: $uuid → $mac');
+    debugPrint('🍎 iOS UUID→MAC saved: $uuid → $mac');
   }
 
-  // For sensors like Type 3, the MAC is never in the advertisement data.
-  // On first scan we detect them by service UUID 2a6e and, if there is
-  // exactly one unambiguous Type 3 capteur, create a persistent mapping.
-  String? _tryAutoMapType3(String uuid, AdvertisementData adv) {
-    final hasType3Service = adv.serviceData.keys.any(
-      (k) => k.toString().toLowerCase().contains('2a6e'),
-    );
-    if (!hasType3Service) return null;
+  /// Returns the set of all MACs registered in LIST_CAPTEURS (lowercase, trimmed).
+  Set<String> _knownMacsLower() {
+    final macs = <String>{};
+    for (int j = 0; j < _capteursBox.length; j++) {
+      final raw = _capteursBox.getAt(j);
+      if (raw == null) continue;
+      final mac = (raw['MacAddrs']?.toString() ?? '').trim().toLowerCase();
+      if (_looksLikeMac(mac)) macs.add(mac);
+    }
+    return macs;
+  }
+
+  /// For Type 3 (service UUID 2a6e) when no MAC is in manufacturer data:
+  /// if exactly one Type 3 capteur is registered and not yet mapped,
+  /// auto-map the CoreBluetooth UUID to it.
+  String? _tryAutoMapByServiceUuid(String uuid, AdvertisementData adv) {
+    // Accept match from serviceData keys OR serviceUuids list
+    final has2a6e =
+        adv.serviceData.keys
+            .any((k) => k.toString().toLowerCase().contains('2a6e')) ||
+        adv.serviceUuids
+            .any((u) => u.toString().toLowerCase().contains('2a6e'));
+    if (!has2a6e) return null;
 
     final mappedMacs = _iosUuidToMacCache.values.toSet();
     final candidates = <String>[];
@@ -326,33 +343,55 @@ class _HomePageState extends State<HomePage> {
   }
 
   // Returns the effective MAC to use for LIST_CAPTEURS matching.
-  // On Android the remoteId IS the MAC; on iOS we extract it from the adv data
-  // or fall back to a persisted UUID→MAC mapping (needed for Type 3).
   String _resolveDeviceMac(ScanResult result) {
     if (!Platform.isIOS) return result.device.remoteId.str;
 
     final uuid = result.device.remoteId.str;
 
-    // 1. Persistent mapping (set on a previous scan or app launch)
+    // 1. Persistent mapping (fastest path after first resolution)
     if (_iosUuidToMacCache.containsKey(uuid)) {
       return _iosUuidToMacCache[uuid]!;
     }
 
-    // 2. Extract MAC from manufacturer data (Type 1 / 6 / 10)
+    // 2. Known manufacturer data layouts (Type 1 / 6 / 10)
     final extracted = _extractMacFromAdv(result.advertisementData);
     if (extracted != null) {
-      debugPrint('🍎 iOS extracted MAC: $extracted (UUID: $uuid)');
+      debugPrint('🍎 iOS known-layout MAC: $extracted (UUID: $uuid)');
+      _saveIosUuidMapping(uuid, extracted);
       return extracted;
     }
 
-    // 3. Auto-map Type 3 by service UUID 2a6e when only one candidate exists
-    final autoMapped = _tryAutoMapType3(uuid, result.advertisementData);
+    // 3. Generic scan: slide a 6-byte window over every manufacturer data
+    //    entry and check if any window matches a registered capteur MAC.
+    final knownMacs = _knownMacsLower();
+    for (final entry in result.advertisementData.manufacturerData.entries) {
+      final bytes = entry.value;
+      for (int offset = 0; offset + 6 <= bytes.length; offset++) {
+        final candidate =
+            _bytesToMac(bytes.sublist(offset, offset + 6)).toLowerCase();
+        if (knownMacs.contains(candidate)) {
+          final mac = candidate.toUpperCase();
+          debugPrint(
+            '🍎 iOS generic MAC at mfgId=${entry.key} offset=$offset: $mac',
+          );
+          _saveIosUuidMapping(uuid, mac);
+          return mac;
+        }
+      }
+    }
+
+    // 4. Service-UUID auto-map for Type 3 (no MAC in advertisement at all)
+    final autoMapped = _tryAutoMapByServiceUuid(uuid, result.advertisementData);
     if (autoMapped != null) return autoMapped;
 
+    // Nothing worked — log everything so we can diagnose the sensor format
     debugPrint(
-      '🍎 iOS no MAC resolved for UUID: $uuid '
-      'mfgKeys=${result.advertisementData.manufacturerData.keys.toList()} '
-      'svcKeys=${result.advertisementData.serviceData.keys.toList()}',
+      '🍎 iOS UNRESOLVED UUID: $uuid\n'
+      '   name="${result.advertisementData.advName}"\n'
+      '   mfg=${result.advertisementData.manufacturerData.entries.map((e) => 'id=${e.key}(0x${e.key.toRadixString(16)}) '
+              'hex=${e.value.map((b) => b.toRadixString(16).padLeft(2, '0')).join()}').join(' | ')}\n'
+      '   svcData=${result.advertisementData.serviceData.keys.toList()}\n'
+      '   svcUuids=${result.advertisementData.serviceUuids}',
     );
     return uuid;
   }
