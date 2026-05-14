@@ -25,8 +25,13 @@ class NotificationService {
         importance: Importance.max,
         priority: Priority.high,
         playSound: true,
-        //Custom sound
         sound: RawResourceAndroidNotificationSound('alarm'),
+      ),
+      iOS: DarwinNotificationDetails(
+        presentAlert: true,
+        presentBadge: true,
+        presentSound: true,
+        sound: 'alarm.mp3',
       ),
     );
     await flutterLocalNotificationsPlugin.show(
