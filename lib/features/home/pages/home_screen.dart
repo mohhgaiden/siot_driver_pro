@@ -108,6 +108,9 @@ class _HomePageState extends State<HomePage> {
   // Tri d'affichage des capteurs (persisté dans `_userBox` sous `sort_mode`).
   _SensorSort _sortMode = _SensorSort.nameAsc;
 
+  // ─── iOS UUID → MAC mapping (Type 3 sensors have no MAC in adv data) ────────
+  final Map<String, String> _iosUuidToMacCache = {};
+
   // ─── Per-device alert tracking ───────────────────────────────────────────────
   final Map<String, DateTime> _lastNotificationPerDevice = {};
   static const _notificationCooldown = Duration(minutes: 1);
@@ -131,6 +134,7 @@ class _HomePageState extends State<HomePage> {
   @override
   void initState() {
     super.initState();
+    if (Platform.isIOS) _loadIosUuidMap();
     startBleService();
     _user = _userBox.getAt(0) as Map;
     _userId = _user['uuid_user'] as String;
@@ -279,26 +283,78 @@ class _HomePageState extends State<HomePage> {
     return null;
   }
 
+  // ─── iOS UUID → MAC helpers ──────────────────────────────────────────────────
+
+  void _loadIosUuidMap() {
+    final box = Hive.box('IOS_UUID_MAC');
+    for (final key in box.keys) {
+      final mac = box.get(key)?.toString();
+      if (mac != null) _iosUuidToMacCache[key.toString()] = mac;
+    }
+    debugPrint('🍎 iOS UUID map loaded: ${_iosUuidToMacCache.length} entries');
+  }
+
+  void _saveIosUuidMapping(String uuid, String mac) {
+    _iosUuidToMacCache[uuid] = mac;
+    Hive.box('IOS_UUID_MAC').put(uuid, mac);
+    debugPrint('🍎 iOS UUID→MAC auto-mapped: $uuid → $mac');
+  }
+
+  // For sensors like Type 3, the MAC is never in the advertisement data.
+  // On first scan we detect them by service UUID 2a6e and, if there is
+  // exactly one unambiguous Type 3 capteur, create a persistent mapping.
+  String? _tryAutoMapType3(String uuid, AdvertisementData adv) {
+    final hasType3Service = adv.serviceData.keys.any(
+      (k) => k.toString().toLowerCase().contains('2a6e'),
+    );
+    if (!hasType3Service) return null;
+
+    final mappedMacs = _iosUuidToMacCache.values.toSet();
+    final candidates = <String>[];
+    for (int j = 0; j < _capteursBox.length; j++) {
+      final raw = _capteursBox.getAt(j);
+      if (raw == null) continue;
+      if ((raw['Type']?.toString() ?? '') != '3') continue;
+      final mac = (raw['MacAddrs']?.toString() ?? '').trim();
+      if (mac.isEmpty || mappedMacs.contains(mac)) continue;
+      candidates.add(mac);
+    }
+
+    if (candidates.length != 1) return null;
+    _saveIosUuidMapping(uuid, candidates.first);
+    return candidates.first;
+  }
+
   // Returns the effective MAC to use for LIST_CAPTEURS matching.
-  // On Android the remoteId IS the MAC; on iOS we extract it from the adv data.
+  // On Android the remoteId IS the MAC; on iOS we extract it from the adv data
+  // or fall back to a persisted UUID→MAC mapping (needed for Type 3).
   String _resolveDeviceMac(ScanResult result) {
     if (!Platform.isIOS) return result.device.remoteId.str;
-    final extracted = _extractMacFromAdv(result.advertisementData);
-    if (kDebugMode) {
-      if (extracted != null) {
-        debugPrint(
-          '🍎 iOS extracted MAC: $extracted '
-          '(UUID: ${result.device.remoteId.str})',
-        );
-      } else {
-        debugPrint(
-          '🍎 iOS no MAC in adv for UUID: ${result.device.remoteId.str} '
-          'mfgKeys=${result.advertisementData.manufacturerData.keys.toList()} '
-          'svcKeys=${result.advertisementData.serviceData.keys.toList()}',
-        );
-      }
+
+    final uuid = result.device.remoteId.str;
+
+    // 1. Persistent mapping (set on a previous scan or app launch)
+    if (_iosUuidToMacCache.containsKey(uuid)) {
+      return _iosUuidToMacCache[uuid]!;
     }
-    return extracted ?? result.device.remoteId.str;
+
+    // 2. Extract MAC from manufacturer data (Type 1 / 6 / 10)
+    final extracted = _extractMacFromAdv(result.advertisementData);
+    if (extracted != null) {
+      debugPrint('🍎 iOS extracted MAC: $extracted (UUID: $uuid)');
+      return extracted;
+    }
+
+    // 3. Auto-map Type 3 by service UUID 2a6e when only one candidate exists
+    final autoMapped = _tryAutoMapType3(uuid, result.advertisementData);
+    if (autoMapped != null) return autoMapped;
+
+    debugPrint(
+      '🍎 iOS no MAC resolved for UUID: $uuid '
+      'mfgKeys=${result.advertisementData.manufacturerData.keys.toList()} '
+      'svcKeys=${result.advertisementData.serviceData.keys.toList()}',
+    );
+    return uuid;
   }
 
   // ─── Bluetooth ───────────────────────────────────────────────────────────────

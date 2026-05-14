@@ -66,6 +66,7 @@ Future<void> _initHive() async {
     Hive.openBox('ACTIVITY_START_END'),
     Hive.openBox('USER_PASS'),
     Hive.openBox('APP_SETTINGS'),
+    Hive.openBox('IOS_UUID_MAC'),
   ]);
 }
 
