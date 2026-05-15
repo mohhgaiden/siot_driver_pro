@@ -780,75 +780,6 @@ class _HomePageState extends State<HomePage> {
       }
     }
   }
-  /*Future<void> _storeSensorReadings(List<ScanResult> scans) async {
-    for (final result in scans) {
-      final mac = result.device.remoteId.str;
-      final timestamp = result.timeStamp.millisecondsSinceEpoch;
-
-      final uniqueKey = '$mac-$timestamp';
-      if (_dedupCache.contains(uniqueKey)) continue;
-
-      for (int j = 0; j < _capteursBox.length; j++) {
-        final raw = _capteursBox.getAt(j);
-        if (raw == null) continue;
-
-        final capteurMac = (raw['MacAddrs']?.toString() ?? '').trim();
-        if (capteurMac.toLowerCase() != mac.toLowerCase()) continue;
-
-        final typeStr = raw['Type']?.toString() ?? '';
-        final sensorType = _sensorTypeMap[typeStr];
-        if (sensorType == null) continue;
-
-        final existingForDevice =
-            _sensorReadCache
-                .where((e) => e['uuid_user'] == _userId && e['MacAddrs'] == mac)
-                .toList();
-
-        bool isNew;
-        if (existingForDevice.isEmpty) {
-          isNew = true;
-        } else {
-          final lastDate = existingForDevice.last['InfoDate'] as int;
-          isNew = lastDate < result.timeStamp.millisecondsSinceEpoch;
-        }
-        if (!isNew) continue;
-
-        final reading = sensorType.tryParse(
-          result.advertisementData,
-          deviceType: typeStr,
-        );
-        if (reading == null) continue;
-
-        _dedupCache.add(uniqueKey);
-
-        await _sensorReadBox.add({
-          'uuid_user': _userId,
-          'MacAddrs': mac,
-          'temperature': reading.temperature.toStringAsFixed(2),
-          'humidity': reading.humidity?.toStringAsFixed(2) ?? '',
-          'luminosite': reading.luminosity?.toStringAsFixed(2) ?? '',
-          'presure': reading.pressure?.toStringAsFixed(2) ?? '',
-          'lowsignal_strength': result.rssi.toString(),
-          'InfoDate': result.timeStamp.millisecondsSinceEpoch.toString(),
-          'gps_lat': _lat,
-          'gps_long': _long,
-          'gps_time': _time,
-          'gps_speed': _speed,
-          'gps_direction': _dir,
-          'battery_level': reading.voltage?.toStringAsFixed(2) ?? '',
-        });
-
-        await _sensorRead1Box.add({
-          'uuid_user': _userId,
-          'MacAddrs': mac,
-          'temperature': reading.temperature,
-          'humidity': reading.humidity,
-          'presure': reading.pressure,
-          'InfoDate': result.timeStamp.millisecondsSinceEpoch,
-        });
-      }
-    }
-  }*/
 
   // ─── Connectivity & API sync ──────────────────────────────────────────────────
 
@@ -982,14 +913,6 @@ class _HomePageState extends State<HomePage> {
     }
   }
 
-  /// Tente d'envoyer un item d'activité (start/end de mission) au serveur.
-  ///
-  /// L'item est identifié par sa **clé Hive** (et non par un index), pour
-  /// rester stable même si la box est modifiée pendant la boucle de retry.
-  ///
-  /// Retourne `true` si l'item a été synchronisé (et supprimé de la box),
-  /// `false` sinon — auquel cas il restera dans la box et sera retenté
-  /// au prochain cycle (`interval_sync` défini dans le profil).
   Future<bool> _syncActivityByKey(dynamic key) async {
     try {
       final item = _activityBox.get(key);
@@ -1060,14 +983,6 @@ class _HomePageState extends State<HomePage> {
     'gps_direction': _dir,
   };
 
-  /// Enregistre un évènement de mission (1 = démarrage, 2 = fin) puis tente
-  /// un envoi **immédiat** au serveur si Internet est disponible.
-  ///
-  /// • Si l'envoi réussit → l'item est supprimé de la box.
-  /// • Si l'envoi échoue (pas de connexion, timeout, erreur backend…) →
-  ///   l'item reste dans `_activityBox` et sera ré-envoyé automatiquement
-  ///   par `_checkConnectivity` au prochain `interval_sync` (paramétrable
-  ///   dans Profil → Synchronisation).
   Future<void> _recordActivity(String type) async {
     // 1) Toujours sauvegarder localement d'abord (single source of truth).
     final key = await _activityBox.add({
@@ -1325,6 +1240,288 @@ class _HomePageState extends State<HomePage> {
   }
 
   Widget _buildBody() {
+  // 🔥 Remove duplicates by MAC / UUID
+  final uniqueDevices = <String, ScanResult>{};
+
+  for (final result in _scanResults) {
+    final id = Platform.isIOS
+        ? result.device.remoteId.str
+        : _resolveDeviceMac(result);
+
+    if (!uniqueDevices.containsKey(id)) {
+      uniqueDevices[id] = result;
+    }
+  }
+
+  // 🔥 Convert map to list
+  final devices = uniqueDevices.values.toList();
+
+  // 🔥 Sort by nearest signal
+  devices.sort((a, b) => b.rssi.compareTo(a.rssi));
+
+  return Column(
+    children: [
+      // ─────────────────────────────
+      // Mission panel
+      // ─────────────────────────────
+      _buildMissionPanel(),
+
+      // ─────────────────────────────
+      // Header
+      // ─────────────────────────────
+      Padding(
+        padding: const EdgeInsets.fromLTRB(14, 10, 14, 10),
+        child: Row(
+          children: [
+            Container(
+              width: 28,
+              height: 28,
+              alignment: Alignment.center,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                color: const Color(0xFFF0F5FF),
+                border: Border.all(
+                  color: const Color(0xFFDDE6FF),
+                ),
+              ),
+              child: Text(
+                '${devices.length}',
+                style: const TextStyle(
+                  fontSize: 12,
+                  fontWeight: FontWeight.bold,
+                  color: Color(0xFF007FFF),
+                ),
+              ),
+            ),
+
+            const SizedBox(width: 8),
+
+            const Text(
+              'Scanned BLE Devices',
+              style: TextStyle(
+                fontSize: 18,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+
+            const Spacer(),
+
+            IconButton(
+              onPressed: _restartBluetooth,
+              icon: const Icon(Icons.refresh),
+            ),
+          ],
+        ),
+      ),
+
+      // ─────────────────────────────
+      // Devices list
+      // ─────────────────────────────
+      Expanded(
+        child: RefreshIndicator(
+          onRefresh: _onPullToRefresh,
+          child: ListView.builder(
+            physics: const AlwaysScrollableScrollPhysics(
+              parent: BouncingScrollPhysics(),
+            ),
+            itemCount: devices.length,
+            itemBuilder: (context, index) {
+              final result = devices[index];
+
+              final mac = Platform.isIOS
+                  ? result.device.remoteId.str
+                  : _resolveDeviceMac(result);
+
+              final advName =
+                  result.advertisementData.advName;
+
+              final platformName =
+                  result.device.platformName;
+
+              final name = advName.isNotEmpty
+                  ? advName
+                  : platformName.isNotEmpty
+                      ? platformName
+                      : 'Unknown Device';
+
+              final serviceUuids = result
+                  .advertisementData.serviceUuids;
+
+              final manufacturerData = result
+                  .advertisementData.manufacturerData;
+
+              return Container(
+                margin: const EdgeInsets.symmetric(
+                  horizontal: 12,
+                  vertical: 6,
+                ),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(16),
+                  boxShadow: const [
+                    BoxShadow(
+                      color: Color(0x14000000),
+                      blurRadius: 8,
+                      offset: Offset(0, 2),
+                    ),
+                  ],
+                ),
+                child: ExpansionTile(
+                  tilePadding: const EdgeInsets.symmetric(
+                    horizontal: 14,
+                    vertical: 6,
+                  ),
+
+                  leading: CircleAvatar(
+                    backgroundColor: const Color(0xFF007FFF),
+                    child: const Icon(
+                      Icons.bluetooth,
+                      color: Colors.white,
+                    ),
+                  ),
+
+                  title: Text(
+                    name,
+                    style: const TextStyle(
+                      fontWeight: FontWeight.bold,
+                      fontSize: 15,
+                    ),
+                  ),
+
+                  subtitle: Padding(
+                    padding: const EdgeInsets.only(top: 4),
+                    child: Column(
+                      crossAxisAlignment:
+                          CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'MAC / UUID: $mac',
+                          style: const TextStyle(
+                            fontSize: 12,
+                          ),
+                        ),
+
+                        const SizedBox(height: 2),
+
+                        Text(
+                          'RSSI: ${result.rssi}',
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: result.rssi > -70
+                                ? Colors.green
+                                : result.rssi > -90
+                                    ? Colors.orange
+                                    : Colors.red,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+
+                  children: [
+                    Padding(
+                      padding: const EdgeInsets.fromLTRB(
+                        16,
+                        0,
+                        16,
+                        14,
+                      ),
+                      child: Column(
+                        crossAxisAlignment:
+                            CrossAxisAlignment.start,
+                        children: [
+                          const Divider(),
+
+                          const Text(
+                            'Advertisement Name',
+                            style: TextStyle(
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+
+                          const SizedBox(height: 4),
+
+                          Text(
+                            advName.isEmpty
+                                ? 'N/A'
+                                : advName,
+                          ),
+
+                          const SizedBox(height: 14),
+
+                          const Text(
+                            'Platform Name',
+                            style: TextStyle(
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+
+                          const SizedBox(height: 4),
+
+                          Text(
+                            platformName.isEmpty
+                                ? 'N/A'
+                                : platformName,
+                          ),
+
+                          const SizedBox(height: 14),
+
+                          const Text(
+                            'Service UUIDs',
+                            style: TextStyle(
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+
+                          const SizedBox(height: 4),
+
+                          Text(
+                            serviceUuids.isEmpty
+                                ? 'No services'
+                                : serviceUuids.join(', '),
+                          ),
+
+                          const SizedBox(height: 14),
+
+                          const Text(
+                            'Manufacturer Data',
+                            style: TextStyle(
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+
+                          const SizedBox(height: 4),
+
+                          Text(
+                            manufacturerData.isEmpty
+                                ? 'No manufacturer data'
+                                : manufacturerData.entries
+                                    .map(
+                                      (e) =>
+                                          'ID ${e.key}: ${e.value.map((b) => b.toRadixString(16).padLeft(2, '0')).join(' ')}',
+                                    )
+                                    .join('\n'),
+                            style: const TextStyle(
+                              fontSize: 12,
+                              fontFamily: 'monospace',
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              );
+            },
+          ),
+        ),
+      ),
+    ],
+  );
+}
+
+  /*Widget _buildBody() {
     final showAlert = _user['user_can_param'] == '1';
     final showPrint = _user['user_can_print'] == '1';
     final showReport = _user['user_can_report'] == '1';
@@ -1353,13 +1550,6 @@ class _HomePageState extends State<HomePage> {
       }
     }
 
-    // 1) Construction de la liste des entrées (capteurs détectés ET enregistrés).
-    //
-    // ⚠️ Dédoublonnage par couple (MAC, Type) :
-    //   - `_scanResults` peut contenir le même MAC plusieurs fois après un
-    //     restart BLE (le stream cumule).
-    //   - `_capteursBox` peut avoir des entrées dupliquées côté serveur.
-    // Sans cette protection, la même carte capteur s'affichait 2× ou plus.
     final entries = <_SensorEntry>[];
     final seenKeys = <String>{};
     for (final result in _scanResults) {
@@ -1394,9 +1584,6 @@ class _HomePageState extends State<HomePage> {
       }
     }
 
-    // 2) Tri en fonction du mode sélectionné.
-    //    - Proximité : RSSI le plus élevé (moins négatif) en premier.
-    //    - Dernière lecture : timestamp BLE le plus récent en premier.
     switch (_sortMode) {
       case _SensorSort.nameAsc:
         entries.sort(
@@ -1499,11 +1686,8 @@ class _HomePageState extends State<HomePage> {
         ),
       ],
     );
-  }
+  }*/
 
-  /// Callback du pull-to-refresh : relance le scan BLE, met à jour la
-  /// position GPS et recharge les alertes. Lance aussi une tentative de
-  /// synchronisation en arrière-plan si Internet est dispo.
   Future<void> _onPullToRefresh() async {
     debugPrint('🔄 Pull-to-refresh déclenché');
     _restartBluetooth();
@@ -1511,10 +1695,7 @@ class _HomePageState extends State<HomePage> {
       _updateLocation(),
       Future(() => _refreshData()),
     ]);
-    // Délai mini pour que le spinner reste visible un instant et que
-    // l'utilisateur perçoive que l'action a bien eu lieu.
     await Future.delayed(const Duration(milliseconds: 600));
-    // Tentative de synchronisation (best-effort, ne bloque pas).
     unawaited(_checkConnectivity());
   }
 
@@ -1531,9 +1712,6 @@ class _HomePageState extends State<HomePage> {
   }
 
   // ─── Tri des capteurs ────────────────────────────────────────────────────────
-
-  /// Sauvegarde le mode de tri choisi dans le `_userBox` (clé `sort_mode`)
-  /// pour que la préférence soit conservée d'une session à l'autre.
   void _saveSortMode(_SensorSort mode) {
     setState(() => _sortMode = mode);
     if (_userBox.isEmpty) return;
