@@ -48,12 +48,22 @@ class SensorReading {
       voltage: voltage,
     );
   }
-
-  factory SensorReading.type3(Uint8List b) {
+  /*factory SensorReading.type3(Uint8List b) {
     final rawTemp = ByteData.sublistView(b, 0, 2).getUint16(0, Endian.little);
     return SensorReading(
       temperature: _decodeTwosComplement16(rawTemp, scale: 0.01),
     );
+  }*/
+  factory SensorReading.type3(Uint8List b) {
+    if (b.length < 2) {
+      throw Exception('TYPE3 INVALID DATA LENGTH');
+    }
+
+    final rawTemp = ByteData.sublistView(b, 0, 2).getUint16(0, Endian.little);
+
+    final temperature = _decodeTwosComplement16(rawTemp, scale: 0.01);
+
+    return SensorReading(temperature: temperature);
   }
 
   factory SensorReading.type6(Uint8List b, {required bool includeHumidity}) {
@@ -135,6 +145,7 @@ class _AlertThreshold {
 
 enum SensorType { type1, type3, type6, type10 }
 
+/*
 extension SensorTypeX on SensorType {
   /// Recherche tolérante d'une serviceData par UUID court (ex: "2a6e").
   /// flutter_blue_plus peut renvoyer la clé en forme courte ou complète
@@ -189,6 +200,120 @@ extension SensorTypeX on SensorType {
       }
     } catch (e) {
       debugPrint('SensorReading parse error [$name]: $e');
+      return null;
+    }
+  }
+}*/
+extension SensorTypeX on SensorType {
+  /// Search serviceData using tolerant UUID matching
+  static List<int>? _findServiceData(AdvertisementData adv, String shortUuid) {
+    final target = shortUuid.toLowerCase();
+
+    for (final entry in adv.serviceData.entries) {
+      final key = entry.key.toString().toLowerCase();
+
+      debugPrint('🔍 SERVICE UUID = $key');
+
+      // Match:
+      // 2a6e
+      // 00002a6e-0000-1000-8000-00805f9b34fb
+      if (key.contains(target)) {
+        return entry.value;
+      }
+    }
+
+    return null;
+  }
+
+  /// Search manufacturer data fallback
+  static List<int>? _findManufacturerFallback(AdvertisementData adv) {
+    if (adv.manufacturerData.isEmpty) {
+      return null;
+    }
+
+    for (final entry in adv.manufacturerData.entries) {
+      debugPrint('🔍 MFG KEY=${entry.key} DATA=${entry.value}');
+
+      if (entry.value.isNotEmpty) {
+        return entry.value;
+      }
+    }
+
+    return null;
+  }
+
+  SensorReading? tryParse(AdvertisementData adv, {String deviceType = ''}) {
+    try {
+      switch (this) {
+        // =====================================================
+        // TYPE 1
+        // =====================================================
+        case SensorType.type1:
+          final data = adv.manufacturerData[1177];
+
+          if (data == null || data.isEmpty) {
+            return null;
+          }
+
+          return SensorReading.type1(Uint8List.fromList(data));
+
+        // =====================================================
+        // TYPE 3  ✅ FIXED IOS SUPPORT
+        // =====================================================
+        case SensorType.type3:
+          debugPrint('============== TYPE3 DEBUG ==============');
+          debugPrint('Device name: ${adv.advName}');
+          debugPrint('ServiceData: ${adv.serviceData}');
+          debugPrint('ManufacturerData: ${adv.manufacturerData}');
+          debugPrint('=========================================');
+
+          // FIRST TRY → serviceData
+          List<int>? data = _findServiceData(adv, '2a6e');
+
+          // IOS FALLBACK → manufacturerData
+          data ??= _findManufacturerFallback(adv);
+
+          if (data == null || data.length < 2) {
+            debugPrint('❌ TYPE3 NO DATA FOUND');
+            return null;
+          }
+
+          debugPrint('✅ TYPE3 DATA FOUND = $data');
+
+          return SensorReading.type3(Uint8List.fromList(data));
+
+        // =====================================================
+        // TYPE 6
+        // =====================================================
+        case SensorType.type6:
+          final data = adv.manufacturerData[65535];
+
+          if (data == null || data.isEmpty) {
+            return null;
+          }
+
+          return SensorReading.type6(
+            Uint8List.fromList(data),
+            includeHumidity: deviceType == '6',
+          );
+
+        // =====================================================
+        // TYPE 10
+        // =====================================================
+        case SensorType.type10:
+          final data = adv.manufacturerData[3278];
+
+          if (data == null || data.isEmpty) {
+            return null;
+          }
+
+          return SensorReading.type10(Uint8List.fromList(data));
+      }
+    } catch (e, s) {
+      debugPrint('❌ Sensor parse error [$name]');
+      debugPrint('$e');
+      debugPrint('$s');
+
       return null;
     }
   }
@@ -689,7 +814,8 @@ class _ScanResultCardState extends State<ScanResultCard> {
           icon: Icons.access_time_rounded,
           // Format : JJ/MM HH:MM:SS  (ex. "08/05 14:32:07")
           label: () {
-            final ts = widget.result.timeStamp.toString(); // 2026-05-08 14:32:07.xxx
+            final ts =
+                widget.result.timeStamp.toString(); // 2026-05-08 14:32:07.xxx
             final date = ts.substring(0, 10); // 2026-05-08
             final time = ts.substring(11, 19); // 14:32:07
             final dmy = '${date.substring(8, 10)}/${date.substring(5, 7)}';
@@ -863,9 +989,10 @@ class _FooterChip extends StatelessWidget {
             style: TextStyle(
               fontSize: fontSize,
               color: color,
-              fontWeight: isAlert
-                  ? FontWeight.w700
-                  : (large ? FontWeight.w600 : FontWeight.normal),
+              fontWeight:
+                  isAlert
+                      ? FontWeight.w700
+                      : (large ? FontWeight.w600 : FontWeight.normal),
             ),
           ),
         ],

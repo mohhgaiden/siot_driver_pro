@@ -3,9 +3,7 @@ import 'dart:io';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 
 class NotificationService {
-
-  static final FlutterLocalNotificationsPlugin
-      flutterLocalNotificationsPlugin =
+  static final FlutterLocalNotificationsPlugin flutterLocalNotificationsPlugin =
       FlutterLocalNotificationsPlugin();
 
   @pragma('vm:entry-point')
@@ -14,25 +12,19 @@ class NotificationService {
   }
 
   static Future init() async {
-
     const DarwinInitializationSettings iosSettings =
         DarwinInitializationSettings(
+          requestAlertPermission: true,
+          requestBadgePermission: true,
+          requestSoundPermission: true,
 
-      requestAlertPermission: true,
-      requestBadgePermission: true,
-      requestSoundPermission: true,
+          defaultPresentAlert: true,
+          defaultPresentBadge: true,
+          defaultPresentSound: true,
+        );
 
-      defaultPresentAlert: true,
-      defaultPresentBadge: true,
-      defaultPresentSound: true,
-    );
-
-    const InitializationSettings settings =
-        InitializationSettings(
-
-      android: AndroidInitializationSettings(
-        '@mipmap/ic_launcher',
-      ),
+    const InitializationSettings settings = InitializationSettings(
+      android: AndroidInitializationSettings('@mipmap/ic_launcher'),
 
       iOS: iosSettings,
     );
@@ -44,15 +36,11 @@ class NotificationService {
     );
 
     if (Platform.isIOS) {
-
       await flutterLocalNotificationsPlugin
           .resolvePlatformSpecificImplementation<
-              IOSFlutterLocalNotificationsPlugin>()
-          ?.requestPermissions(
-            alert: true,
-            badge: true,
-            sound: true,
-          );
+            IOSFlutterLocalNotificationsPlugin
+          >()
+          ?.requestPermissions(alert: true, badge: true, sound: true);
     }
   }
 
@@ -61,10 +49,7 @@ class NotificationService {
     String title,
     String body,
   ) async {
-
-    const NotificationDetails details =
-        NotificationDetails(
-
+    const NotificationDetails details = NotificationDetails(
       android: AndroidNotificationDetails(
         'id_1',
         'basic_notification',
@@ -79,6 +64,9 @@ class NotificationService {
         presentAlert: true,
         presentBadge: true,
         presentSound: true,
+
+        // Runner/alarm.mp3
+        sound: 'alarm.mp3',
       ),
     );
 
