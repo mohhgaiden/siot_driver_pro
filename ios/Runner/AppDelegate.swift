@@ -1,6 +1,7 @@
 import Flutter
 import UIKit
 import CoreBluetooth
+import UserNotifications
 
 @main
 @objc class AppDelegate: FlutterAppDelegate {
@@ -10,16 +11,21 @@ import CoreBluetooth
     didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]?
   ) -> Bool {
 
-    // Handle BLE state restoration on iOS (required for background BLE in release)
+    // Required for iOS foreground notifications
+    UNUserNotificationCenter.current().delegate = self
+
+    // Handle BLE state restoration
     if let restorationIds = launchOptions?[.bluetoothCentrals] as? [String],
        !restorationIds.isEmpty {
-      // The system is relaunching the app to restore BLE state.
-      // flutter_blue_plus handles the actual restoration internally;
-      // we just need to NOT block this launch path.
+
       debugPrint("Restoring BLE central managers: \(restorationIds)")
     }
 
     GeneratedPluginRegistrant.register(with: self)
-    return super.application(application, didFinishLaunchingWithOptions: launchOptions)
+
+    return super.application(
+      application,
+      didFinishLaunchingWithOptions: launchOptions
+    )
   }
 }

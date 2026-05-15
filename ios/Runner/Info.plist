@@ -53,23 +53,30 @@
 	<!-- ========================= -->
 
 	<key>NSBluetoothAlwaysUsageDescription</key>
-	<string>S-IOT Driver uses Bluetooth to continuously scan for and connect to nearby BLE environmental sensors (temperature, humidity, pressure). For example, the app detects your paired "RuuviTag" sensor and records its live temperature readings even when the app is in the background.</string>
+	<string>S-IOT Driver uses Bluetooth to continuously scan for and connect to nearby BLE environmental sensors (temperature, humidity, pressure).</string>
 
 	<key>NSBluetoothPeripheralUsageDescription</key>
-	<string>S-IOT Driver uses Bluetooth to communicate with BLE environmental sensors. For example, the app reads temperature, humidity, and pressure data broadcast by your paired sensor and logs it for monitoring and reporting.</string>
+	<string>S-IOT Driver uses Bluetooth to communicate with BLE environmental sensors.</string>
 
 	<!-- ========================= -->
 	<!-- LOCATION -->
 	<!-- ========================= -->
 
 	<key>NSLocationWhenInUseUsageDescription</key>
-	<string>S-IOT Driver uses your location to attach GPS coordinates to sensor readings while you are using the app. For example, when a temperature alert is recorded, the app saves the GPS position so you can see exactly where the reading was taken in reports.</string>
+	<string>S-IOT Driver uses your location to attach GPS coordinates to sensor readings while you are using the app.</string>
 
 	<key>NSLocationAlwaysAndWhenInUseUsageDescription</key>
-	<string>S-IOT Driver uses your location in the background to continuously tag sensor readings with GPS coordinates during active monitoring missions. For example, while running a delivery mission, each sensor reading is stamped with its location so you can trace the environmental conditions along the route.</string>
+	<string>S-IOT Driver uses your location in the background to continuously tag sensor readings with GPS coordinates during active monitoring missions.</string>
 
 	<key>NSLocationAlwaysUsageDescription</key>
-	<string>S-IOT Driver uses your location at all times to tag sensor readings with GPS coordinates during monitoring missions. For example, each temperature or humidity log entry is stamped with the location where it was recorded, enabling full traceability in exported reports.</string>
+	<string>S-IOT Driver uses your location at all times to tag sensor readings with GPS coordinates during monitoring missions.</string>
+
+	<!-- ========================= -->
+	<!-- NOTIFICATIONS -->
+	<!-- ========================= -->
+
+	<key>NSUserNotificationUsageDescription</key>
+	<string>This app sends notifications for sensor alerts and monitoring updates.</string>
 
 	<!-- ========================= -->
 	<!-- LOCAL NETWORK -->
