@@ -234,8 +234,10 @@ class _HomePageState extends State<HomePage> {
       const Duration(seconds: 30),
       (_) => _storeSensorReadings(_scanResults),
     );
-    debugPrint('⏱ Store timer = 30 s tick, '
-        'interval_stockage utilisateur = $storeInterval min');
+    debugPrint(
+      '⏱ Store timer = 30 s tick, '
+      'interval_stockage utilisateur = $storeInterval min',
+    );
 
     debugPrint(
       '⏱ Timers set — refresh: ${refresh.inSeconds}s | store: ${storeInterval}min',
@@ -314,32 +316,26 @@ class _HomePageState extends State<HomePage> {
     return macs;
   }
 
-  /// For Type 3 (service UUID 2a6e) when no MAC is in manufacturer data:
-  /// if exactly one Type 3 capteur is registered and not yet mapped,
-  /// auto-map the CoreBluetooth UUID to it.
+  /// iOS only: resolves a CoreBluetooth UUID to a registered capteur MAC
+  /// by matching the BLE advertisement name against Name_manufacturer in Hive.
   String? _tryAutoMapByServiceUuid(String uuid, AdvertisementData adv) {
-    // Accept match from serviceData keys OR serviceUuids list
-    final has2a6e =
-        adv.serviceData.keys
-            .any((k) => k.toString().toLowerCase().contains('2a6e')) ||
-        adv.serviceUuids
-            .any((u) => u.toString().toLowerCase().contains('2a6e'));
-    if (!has2a6e) return null;
+    final advName = adv.advName.trim();
+    if (advName.isEmpty) return null;
 
-    final mappedMacs = _iosUuidToMacCache.values.toSet();
-    final candidates = <String>[];
     for (int j = 0; j < _capteursBox.length; j++) {
       final raw = _capteursBox.getAt(j);
       if (raw == null) continue;
-      if ((raw['Type']?.toString() ?? '') != '3') continue;
+      final storedName = (raw['Name_manufacturer']?.toString() ?? '').trim();
+      if (storedName.isEmpty) continue;
+      if (storedName.toLowerCase() != advName.toLowerCase()) continue;
       final mac = (raw['MacAddrs']?.toString() ?? '').trim();
-      if (mac.isEmpty || mappedMacs.contains(mac)) continue;
-      candidates.add(mac);
+      if (mac.isEmpty) continue;
+      debugPrint('🍎 iOS Name_manufacturer match: "$advName" → $mac');
+      _saveIosUuidMapping(uuid, mac);
+      return mac;
     }
 
-    if (candidates.length != 1) return null;
-    _saveIosUuidMapping(uuid, candidates.first);
-    return candidates.first;
+    return null;
   }
 
   // Returns the effective MAC to use for LIST_CAPTEURS matching.
@@ -389,7 +385,7 @@ class _HomePageState extends State<HomePage> {
       '🍎 iOS UNRESOLVED UUID: $uuid\n'
       '   name="${result.advertisementData.advName}"\n'
       '   mfg=${result.advertisementData.manufacturerData.entries.map((e) => 'id=${e.key}(0x${e.key.toRadixString(16)}) '
-              'hex=${e.value.map((b) => b.toRadixString(16).padLeft(2, '0')).join()}').join(' | ')}\n'
+      'hex=${e.value.map((b) => b.toRadixString(16).padLeft(2, '0')).join()}').join(' | ')}\n'
       '   svcData=${result.advertisementData.serviceData.keys.toList()}\n'
       '   svcUuids=${result.advertisementData.serviceUuids}',
     );
@@ -470,11 +466,9 @@ class _HomePageState extends State<HomePage> {
       // Détection de nouveaux capteurs (MAC jamais vu dans cette session BLE).
       // Tant qu'un nouveau capteur apparaît, on contourne le throttle pour
       // l'afficher immédiatement.
-      final currentMacs = results
-          .map((r) => r.device.remoteId.str.toLowerCase())
-          .toSet();
-      final hasNewDevice =
-          currentMacs.any((m) => !knownMacs.contains(m));
+      final currentMacs =
+          results.map((r) => r.device.remoteId.str.toLowerCase()).toSet();
+      final hasNewDevice = currentMacs.any((m) => !knownMacs.contains(m));
 
       // Premier scan, throttle écoulé, OU nouveau capteur → on rafraîchit.
       // Sinon on garde les anciennes valeurs et on ne traite que les alertes.
@@ -495,18 +489,21 @@ class _HomePageState extends State<HomePage> {
       if (kDebugMode) {
         for (final r in results) {
           final adv = r.advertisementData;
-          final name = adv.advName.isNotEmpty
-              ? adv.advName
-              : r.device.platformName;
+          final name =
+              adv.advName.isNotEmpty ? adv.advName : r.device.platformName;
           final mfg = adv.manufacturerData.entries
-              .map((e) =>
-                  'id=${e.key} (0x${e.key.toRadixString(16)}) '
-                  'data=${e.value.map((b) => b.toRadixString(16).padLeft(2, '0')).join()}')
+              .map(
+                (e) =>
+                    'id=${e.key} (0x${e.key.toRadixString(16)}) '
+                    'data=${e.value.map((b) => b.toRadixString(16).padLeft(2, '0')).join()}',
+              )
               .join(' | ');
           final svc = adv.serviceData.entries
-              .map((e) =>
-                  'uuid=${e.key} '
-                  'data=${e.value.map((b) => b.toRadixString(16).padLeft(2, '0')).join()}')
+              .map(
+                (e) =>
+                    'uuid=${e.key} '
+                    'data=${e.value.map((b) => b.toRadixString(16).padLeft(2, '0')).join()}',
+              )
               .join(' | ');
           debugPrint(
             '🔎 BLE name="$name" mac=${r.device.remoteId.str} rssi=${r.rssi} '
@@ -772,7 +769,7 @@ class _HomePageState extends State<HomePage> {
 
         _lastWriteMs[macKey] = nowMs;
         debugPrint(
-          '💾 _storeSensorReadings: ${raw['Name']} ($mac) '
+          '💾 _storeSensorReadings: ${raw['Name']} ${raw['Name_manufacturer'] ?? 'hhh'} ($mac) '
           'temp=${reading.temperature.toStringAsFixed(2)}°C '
           '(intervalle ${intervalMin} min)',
         );
@@ -960,9 +957,7 @@ class _HomePageState extends State<HomePage> {
         return true;
       }
 
-      debugPrint(
-        '⚠️ activity backend error: ${result['ACTIVITY_START_END']}',
-      );
+      debugPrint('⚠️ activity backend error: ${result['ACTIVITY_START_END']}');
       return false;
     } on TimeoutException {
       debugPrint('⏱ activity timeout — will retry later');
@@ -1239,7 +1234,7 @@ class _HomePageState extends State<HomePage> {
     );
   }
 
-  Widget _buildBody() {
+  /*Widget _buildBody() {
   // 🔥 Remove duplicates by MAC / UUID
   final uniqueDevices = <String, ScanResult>{};
 
@@ -1519,9 +1514,9 @@ class _HomePageState extends State<HomePage> {
       ),
     ],
   );
-}
+}  */
 
-  /*Widget _buildBody() {
+  Widget _buildBody() {
     final showAlert = _user['user_can_param'] == '1';
     final showPrint = _user['user_can_print'] == '1';
     final showReport = _user['user_can_report'] == '1';
@@ -1530,8 +1525,10 @@ class _HomePageState extends State<HomePage> {
     // Permet de comprendre pourquoi un capteur ne s'affiche pas (mismatch
     // MAC / Type Hive vs scan BLE). Tree-shaké en release grâce à `kDebugMode`.
     if (kDebugMode) {
-      debugPrint('───── _buildBody: ${_scanResults.length} BLE scannés, '
-          '${_capteursBox.length} capteurs enregistrés ─────');
+      debugPrint(
+        '───── _buildBody: ${_scanResults.length} BLE scannés, '
+        '${_capteursBox.length} capteurs enregistrés ─────',
+      );
       for (int j = 0; j < _capteursBox.length; j++) {
         final raw = _capteursBox.getAt(j);
         if (raw == null) continue;
@@ -1539,7 +1536,7 @@ class _HomePageState extends State<HomePage> {
           '  📋 Capteur Hive #$j  '
           'MAC="${raw['MacAddrs']}"  '
           'Type="${raw['Type']}"  '
-          'Name="${raw['Name']}"',
+          'Name="${raw['Name']}" ${raw['Name_manufacturer'] ?? 'hhh'}',
         );
       }
       for (final result in _scanResults) {
@@ -1566,8 +1563,10 @@ class _HomePageState extends State<HomePage> {
         final sensorName = raw['Name']?.toString() ?? '';
         final sensorType = _sensorTypeMap[typeStr];
         if (sensorType == null) {
-          debugPrint('  ⚠️ MAC $mac matchée mais Type="$typeStr" inconnu — '
-              'ajouter dans _sensorTypeMap');
+          debugPrint(
+            '  ⚠️ MAC $mac matchée mais Type="$typeStr" inconnu — '
+            'ajouter dans _sensorTypeMap',
+          );
           continue;
         }
 
@@ -1575,12 +1574,14 @@ class _HomePageState extends State<HomePage> {
         final dedupKey = '${mac.toLowerCase()}|$typeStr';
         if (!seenKeys.add(dedupKey)) continue; // déjà ajoutée → on saute
 
-        entries.add(_SensorEntry(
-          result: result,
-          name: sensorName,
-          type: typeStr,
-          sensorType: sensorType,
-        ));
+        entries.add(
+          _SensorEntry(
+            result: result,
+            name: sensorName,
+            type: typeStr,
+            sensorType: sensorType,
+          ),
+        );
       }
     }
 
@@ -1606,24 +1607,25 @@ class _HomePageState extends State<HomePage> {
     }
 
     // 3) Génération des widgets dans l'ordre trié.
-    final cards = entries.map((e) {
-      final mac = _resolveDeviceMac(e.result);
-      return Padding(
-        key: ValueKey('card_${mac}_${e.type}'),
-        padding: const EdgeInsets.only(bottom: 10),
-        child: ScanResultCard(
-          key: ValueKey('scan_${mac}_${e.type}'),
-          result: e.result,
-          name: e.name,
-          type: e.type,
-          mac: mac,
-          sensorType: e.sensorType,
-          showAlert: showAlert,
-          showPrint: showPrint,
-          showReport: showReport,
-        ),
-      );
-    }).toList();
+    final cards =
+        entries.map((e) {
+          final mac = _resolveDeviceMac(e.result);
+          return Padding(
+            key: ValueKey('card_${mac}_${e.type}'),
+            padding: const EdgeInsets.only(bottom: 10),
+            child: ScanResultCard(
+              key: ValueKey('scan_${mac}_${e.type}'),
+              result: e.result,
+              name: e.name,
+              type: e.type,
+              mac: mac,
+              sensorType: e.sensorType,
+              showAlert: showAlert,
+              showPrint: showPrint,
+              showReport: showReport,
+            ),
+          );
+        }).toList();
 
     return Column(
       children: [
@@ -1659,10 +1661,7 @@ class _HomePageState extends State<HomePage> {
               const Text('Mes Capteurs', style: TextStyles.textBold18),
               const Spacer(),
               // Chip de tri (cliquable → bottom sheet)
-              _SortChip(
-                mode: _sortMode,
-                onTap: _showSortPicker,
-              ),
+              _SortChip(mode: _sortMode, onTap: _showSortPicker),
             ],
           ),
         ),
@@ -1686,15 +1685,12 @@ class _HomePageState extends State<HomePage> {
         ),
       ],
     );
-  }*/
+  }
 
   Future<void> _onPullToRefresh() async {
     debugPrint('🔄 Pull-to-refresh déclenché');
     _restartBluetooth();
-    await Future.wait<void>([
-      _updateLocation(),
-      Future(() => _refreshData()),
-    ]);
+    await Future.wait<void>([_updateLocation(), Future(() => _refreshData())]);
     await Future.delayed(const Duration(milliseconds: 600));
     unawaited(_checkConnectivity());
   }
@@ -1728,13 +1724,14 @@ class _HomePageState extends State<HomePage> {
       context: context,
       backgroundColor: Colors.transparent,
       isScrollControlled: true,
-      builder: (ctx) => _SortPickerSheet(
-        current: _sortMode,
-        onSelected: (mode) {
-          _saveSortMode(mode);
-          Navigator.pop(ctx);
-        },
-      ),
+      builder:
+          (ctx) => _SortPickerSheet(
+            current: _sortMode,
+            onSelected: (mode) {
+              _saveSortMode(mode);
+              Navigator.pop(ctx);
+            },
+          ),
     );
   }
 }
@@ -1877,10 +1874,7 @@ class _SortChip extends StatelessWidget {
 
 /// Bottom sheet listant les 4 modes de tri disponibles.
 class _SortPickerSheet extends StatelessWidget {
-  const _SortPickerSheet({
-    required this.current,
-    required this.onSelected,
-  });
+  const _SortPickerSheet({required this.current, required this.onSelected});
 
   final _SensorSort current;
   final ValueChanged<_SensorSort> onSelected;
@@ -1949,18 +1943,20 @@ class _SortPickerSheet extends StatelessWidget {
                   horizontal: 20,
                   vertical: 14,
                 ),
-                color: selected
-                    ? accent.withValues(alpha: 0.05)
-                    : Colors.transparent,
+                color:
+                    selected
+                        ? accent.withValues(alpha: 0.05)
+                        : Colors.transparent,
                 child: Row(
                   children: [
                     Container(
                       width: 40,
                       height: 40,
                       decoration: BoxDecoration(
-                        color: selected
-                            ? accent.withValues(alpha: 0.12)
-                            : Colors.grey.withValues(alpha: 0.08),
+                        color:
+                            selected
+                                ? accent.withValues(alpha: 0.12)
+                                : Colors.grey.withValues(alpha: 0.08),
                         borderRadius: BorderRadius.circular(10),
                       ),
                       child: Icon(

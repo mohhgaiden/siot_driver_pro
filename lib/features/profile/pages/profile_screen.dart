@@ -1,5 +1,8 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter_blue_plus/flutter_blue_plus.dart';
 import 'package:hive_flutter/adapters.dart';
 import '../../../core/constants/colors.dart';
 import '../../../common/load_image.dart';
@@ -46,24 +49,16 @@ class ProfilePage extends StatefulWidget {
 class _ProfilePageState extends State<ProfilePage> {
   List<Map<String, dynamic>> _user = [];
   List<Map<String, dynamic>> _capteurs = [];
+  List<ScanResult> _scanResults = [];
+  StreamSubscription<List<ScanResult>>? _scanSub;
 
   final _userBox = Hive.box('LOGGED_IN_USER');
   final _capteursBox = Hive.box('LIST_CAPTEURS');
 
-  // Intervalle affichage stocké en SECONDES (permet 30 s, 2 min, 3 min…).
-  // Stockage et synchronisation restent en MINUTES (granularité minute).
-  // ⚠️ Défaut : 1 minute pour l'affichage.
   Duration _intervalAffichage = const Duration(minutes: 1);
   Duration _intervalStockage = const Duration(minutes: 10);
   Duration _intervalSync = const Duration(minutes: 30);
 
-  /// Convertit la valeur brute lue dans Hive pour `interval_affichage`.
-  ///
-  /// Avant cette version, la valeur était stockée en **minutes** (ex. "5").
-  /// Désormais elle est stockée en **secondes** (ex. "60", "300").
-  /// Pour rester compatible avec les anciennes installations, toute valeur
-  /// `< 30` est considérée comme du legacy (minutes → multiplication par 60).
-  /// Défaut : 60 s (= 1 minute).
   static Duration _decodeAffichage(String? raw) {
     final n = int.tryParse(raw ?? '') ?? 60;
     return n < 30
@@ -76,6 +71,15 @@ class _ProfilePageState extends State<ProfilePage> {
     super.initState();
     _loadUser();
     _loadCapteurs();
+    _scanSub = FlutterBluePlus.scanResults.listen((results) {
+      if (mounted) setState(() => _scanResults = results);
+    });
+  }
+
+  @override
+  void dispose() {
+    _scanSub?.cancel();
+    super.dispose();
   }
 
   void _loadUser() {
@@ -101,7 +105,9 @@ class _ProfilePageState extends State<ProfilePage> {
     final users = data.reversed.toList();
     if (users.isNotEmpty) {
       final u = users.first;
-      _intervalAffichage = _decodeAffichage(u['interval_affichage']?.toString());
+      _intervalAffichage = _decodeAffichage(
+        u['interval_affichage']?.toString(),
+      );
       _intervalStockage = Duration(
         minutes: int.tryParse(u['interval_stockage']?.toString() ?? '') ?? 10,
       );
@@ -196,6 +202,8 @@ class _ProfilePageState extends State<ProfilePage> {
               childCount: _capteurs.length,
             ),
           ),
+          SliverToBoxAdapter(child: _buildScannedDevicesHeader()),
+          SliverToBoxAdapter(child: _buildScannedDevicesCard()),
           const SliverToBoxAdapter(child: SizedBox(height: 28)),
         ],
       ),
@@ -439,17 +447,18 @@ class _ProfilePageState extends State<ProfilePage> {
             color: Colours.app_main,
             intervals: _kIntervalsAffichage,
             current: _intervalAffichage,
-            onTap: () => _pickInterval(
-              title: 'Intervalle Affichage',
-              icon: Icons.monitor_rounded,
-              color: Colours.app_main,
-              intervals: _kIntervalsAffichage,
-              current: _intervalAffichage,
-              onSelected: (v) {
-                setState(() => _intervalAffichage = v);
-                _saveInterval('interval_affichage', v.inSeconds);
-              },
-            ),
+            onTap:
+                () => _pickInterval(
+                  title: 'Intervalle Affichage',
+                  icon: Icons.monitor_rounded,
+                  color: Colours.app_main,
+                  intervals: _kIntervalsAffichage,
+                  current: _intervalAffichage,
+                  onSelected: (v) {
+                    setState(() => _intervalAffichage = v);
+                    _saveInterval('interval_affichage', v.inSeconds);
+                  },
+                ),
           ),
 
           const Padding(
@@ -466,17 +475,18 @@ class _ProfilePageState extends State<ProfilePage> {
             color: const Color(0xFF8B5CF6),
             intervals: _kIntervalsMinutes,
             current: _intervalStockage,
-            onTap: () => _pickInterval(
-              title: 'Intervalle Stockage',
-              icon: Icons.storage_rounded,
-              color: const Color(0xFF8B5CF6),
-              intervals: _kIntervalsMinutes,
-              current: _intervalStockage,
-              onSelected: (v) {
-                setState(() => _intervalStockage = v);
-                _saveInterval('interval_stockage', v.inMinutes);
-              },
-            ),
+            onTap:
+                () => _pickInterval(
+                  title: 'Intervalle Stockage',
+                  icon: Icons.storage_rounded,
+                  color: const Color(0xFF8B5CF6),
+                  intervals: _kIntervalsMinutes,
+                  current: _intervalStockage,
+                  onSelected: (v) {
+                    setState(() => _intervalStockage = v);
+                    _saveInterval('interval_stockage', v.inMinutes);
+                  },
+                ),
           ),
 
           const Padding(
@@ -523,12 +533,13 @@ class _ProfilePageState extends State<ProfilePage> {
     required Duration current,
     required VoidCallback onTap,
   }) {
-    final intervalLabel = intervals
-        .firstWhere(
-          (i) => i.duration == current,
-          orElse: () => _Interval(_humanizeDuration(current), current),
-        )
-        .label;
+    final intervalLabel =
+        intervals
+            .firstWhere(
+              (i) => i.duration == current,
+              orElse: () => _Interval(_humanizeDuration(current), current),
+            )
+            .label;
 
     return InkWell(
       onTap: onTap,
@@ -712,6 +723,219 @@ class _ProfilePageState extends State<ProfilePage> {
               ),
             ),
           ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildScannedDevicesHeader() {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 20, 16, 8),
+      child: Text(
+        'Appareils BLE détectés',
+        style: const TextStyle(
+          fontSize: 15,
+          fontWeight: FontWeight.w700,
+          color: Color(0xFF1A1A2E),
+        ),
+      ),
+    );
+  }
+
+  bool _isAuthorized(ScanResult result) {
+    final id = result.device.remoteId.str.toLowerCase();
+    final advName = result.advertisementData.advName.trim().toLowerCase();
+    for (int j = 0; j < _capteursBox.length; j++) {
+      final raw = _capteursBox.getAt(j);
+      if (raw == null) continue;
+      final mac = (raw['MacAddrs']?.toString() ?? '').trim().toLowerCase();
+      if (mac == id) return true;
+      if (advName.isNotEmpty) {
+        final storedName =
+            (raw['Name_manufacturer']?.toString() ?? '').trim().toLowerCase();
+        if (storedName.isNotEmpty && storedName == advName) return true;
+      }
+    }
+    return false;
+  }
+
+  Widget _buildScannedDevicesCard() {
+    // Deduplicate by device id, keep strongest RSSI
+    final seen = <String, ScanResult>{};
+    for (final r in _scanResults) {
+      final id = r.device.remoteId.str;
+      if (!seen.containsKey(id) || r.rssi > seen[id]!.rssi) seen[id] = r;
+    }
+    final devices = seen.values.toList()
+      ..sort((a, b) => b.rssi.compareTo(a.rssi));
+
+    return Container(
+      margin: const EdgeInsets.fromLTRB(16, 0, 16, 12),
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(14),
+        boxShadow: const [
+          BoxShadow(
+            color: Colours.shadow_blue,
+            blurRadius: 10,
+            offset: Offset(0, 2),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(Icons.bluetooth_searching_rounded, color: Colours.app_main),
+              const SizedBox(width: 8),
+              const Expanded(
+                child: Text(
+                  'Appareils scannés',
+                  style: TextStyle(fontSize: 15, fontWeight: FontWeight.w700),
+                ),
+              ),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                decoration: BoxDecoration(
+                  color: Colours.app_main.withValues(alpha: 0.09),
+                  borderRadius: BorderRadius.circular(20),
+                  border: Border.all(color: Colours.app_main.withValues(alpha: 0.3)),
+                ),
+                child: Text(
+                  '${devices.length}',
+                  style: TextStyle(
+                    fontSize: 11,
+                    fontWeight: FontWeight.w600,
+                    color: Colours.app_main,
+                  ),
+                ),
+              ),
+            ],
+          ),
+
+          if (devices.isEmpty) ...[
+            const SizedBox(height: 16),
+            const Row(
+              children: [
+                Icon(Icons.bluetooth_disabled, color: Colors.grey, size: 18),
+                SizedBox(width: 8),
+                Text(
+                  'Aucun appareil détecté',
+                  style: TextStyle(fontSize: 13, color: Colors.grey),
+                ),
+              ],
+            ),
+          ] else ...[
+            const SizedBox(height: 12),
+            ...devices.map((result) {
+              final advName = result.advertisementData.advName;
+              final platformName = result.device.platformName;
+              final name = advName.isNotEmpty
+                  ? advName
+                  : platformName.isNotEmpty
+                      ? platformName
+                      : 'Unknown Device';
+              final id = result.device.remoteId.str;
+              final authorized = _isAuthorized(result);
+
+              return Container(
+                margin: const EdgeInsets.only(bottom: 8),
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                decoration: BoxDecoration(
+                  color: authorized
+                      ? Colours.app_main.withValues(alpha: 0.05)
+                      : Colors.grey.withValues(alpha: 0.05),
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(
+                    color: authorized
+                        ? Colours.app_main.withValues(alpha: 0.15)
+                        : Colors.grey.withValues(alpha: 0.15),
+                  ),
+                ),
+                child: Row(
+                  children: [
+                    Container(
+                      width: 38,
+                      height: 38,
+                      decoration: BoxDecoration(
+                        color: authorized
+                            ? Colours.app_main.withValues(alpha: 0.10)
+                            : Colors.grey.withValues(alpha: 0.10),
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      child: Icon(
+                        Icons.bluetooth_rounded,
+                        size: 18,
+                        color: authorized ? Colours.app_main : Colors.grey,
+                      ),
+                    ),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            name,
+                            style: const TextStyle(
+                              fontSize: 13,
+                              fontWeight: FontWeight.w600,
+                              color: Color(0xFF1A1A2E),
+                            ),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                          const SizedBox(height: 2),
+                          Text(
+                            id,
+                            style: const TextStyle(
+                              fontSize: 11,
+                              color: Colors.grey,
+                              fontFamily: 'monospace',
+                            ),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Column(
+                      crossAxisAlignment: CrossAxisAlignment.end,
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                          decoration: BoxDecoration(
+                            color: authorized
+                                ? Colors.green.withValues(alpha: 0.10)
+                                : Colors.orange.withValues(alpha: 0.10),
+                            borderRadius: BorderRadius.circular(20),
+                          ),
+                          child: Text(
+                            authorized ? 'Autorisé' : 'Inconnu',
+                            style: TextStyle(
+                              color: authorized ? Colors.green : Colors.orange,
+                              fontSize: 10,
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          '${result.rssi} dBm',
+                          style: const TextStyle(
+                            fontSize: 10,
+                            color: Colors.grey,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              );
+            }),
+          ],
         ],
       ),
     );

@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import 'package:hive_flutter/hive_flutter.dart';
@@ -55,6 +56,7 @@ class CapteurSync {
         await capteursBox.add({
           'MacAddrs': (item['MacAddrs']?.toString() ?? '').trim(),
           'Name': item['Name'],
+          'Name_manufacturer': item['Name_manufacturer'],
           'Type': item['Type'],
           'RemoteAlert': item['RemoteAlert'],
           'Option_stockage': item['Option_stockage'],
