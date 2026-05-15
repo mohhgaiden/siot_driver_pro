@@ -64,9 +64,7 @@ class NotificationService {
         presentAlert: true,
         presentBadge: true,
         presentSound: true,
-
-        // Runner/alarm.mp3
-        sound: 'alarm.mp3',
+        sound: 'alarm.caf',
       ),
     );
 

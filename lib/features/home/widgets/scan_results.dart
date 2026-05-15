@@ -55,13 +55,17 @@ class SensorReading {
     );
   }*/
   factory SensorReading.type3(Uint8List b) {
+    debugPrint('TYPE3 RAW BYTES = $b');
+
     if (b.length < 2) {
-      throw Exception('TYPE3 INVALID DATA LENGTH');
+      throw Exception('TYPE3 INVALID DATA');
     }
 
     final rawTemp = ByteData.sublistView(b, 0, 2).getUint16(0, Endian.little);
 
     final temperature = _decodeTwosComplement16(rawTemp, scale: 0.01);
+
+    debugPrint('TYPE3 TEMP = $temperature');
 
     return SensorReading(temperature: temperature);
   }
@@ -263,18 +267,40 @@ extension SensorTypeX on SensorType {
         case SensorType.type3:
           debugPrint('============== TYPE3 DEBUG ==============');
           debugPrint('Device name: ${adv.advName}');
+          debugPrint('Service UUIDS: ${adv.serviceUuids}');
           debugPrint('ServiceData: ${adv.serviceData}');
           debugPrint('ManufacturerData: ${adv.manufacturerData}');
           debugPrint('=========================================');
 
-          // FIRST TRY → serviceData
-          List<int>? data = _findServiceData(adv, '2a6e');
+          List<int>? data;
 
-          // IOS FALLBACK → manufacturerData
+          // ==========================================
+          // TRY SERVICE DATA
+          // ==========================================
+
+          data = _findServiceData(adv, '2a6e');
+
+          // ==========================================
+          // IOS FALLBACK
+          // ==========================================
+
           data ??= _findManufacturerFallback(adv);
+
+          // ==========================================
+          // EXTRA IOS FALLBACK
+          // ==========================================
+
+          if (data == null && adv.manufacturerData.isNotEmpty) {
+            data = adv.manufacturerData.values.first;
+          }
+
+          // ==========================================
+          // NO DATA
+          // ==========================================
 
           if (data == null || data.length < 2) {
             debugPrint('❌ TYPE3 NO DATA FOUND');
+
             return null;
           }
 
